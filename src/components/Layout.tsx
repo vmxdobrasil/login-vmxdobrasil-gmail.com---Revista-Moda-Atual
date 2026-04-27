@@ -10,13 +10,15 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { LayoutTemplate, MonitorPlay, Download } from 'lucide-react'
+import { LayoutTemplate, MonitorPlay, Download, BookOpen, LogOut, LogIn } from 'lucide-react'
 import useEditorStore from '@/stores/use-editor-store'
 import { ExportDialog } from './ExportDialog'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Layout() {
   const location = useLocation()
   const { simulateExport } = useEditorStore()
+  const { user, signOut } = useAuth()
 
   return (
     <SidebarProvider>
@@ -45,8 +47,37 @@ export default function Layout() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location.pathname === '/studio'}>
+                  <Link to="/studio">
+                    <BookOpen className="w-4 h-4" />
+                    <span>Editoria (Studio)</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
+          <div className="p-4 border-t border-sidebar-border">
+            {user ? (
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-sidebar-foreground"
+                onClick={signOut}
+              >
+                <LogOut className="w-4 h-4 mr-2" /> Sair
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                className="w-full justify-start text-sidebar-foreground"
+                asChild
+              >
+                <Link to="/login">
+                  <LogIn className="w-4 h-4 mr-2" /> Entrar
+                </Link>
+              </Button>
+            )}
+          </div>
         </Sidebar>
 
         <main className="flex-1 flex flex-col min-w-0">
