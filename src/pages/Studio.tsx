@@ -28,6 +28,7 @@ import { getMediaAssets, MediaAsset } from '@/services/media_assets'
 import { PostPreviewLayout } from '@/components/studio/layouts'
 import { useToast } from '@/hooks/use-toast'
 import { z } from 'zod'
+import { Sparkles, Loader2 } from 'lucide-react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import pb from '@/lib/pocketbase/client'
@@ -86,6 +87,13 @@ export default function Studio() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
   const [isMediaSelectorOpen, setIsMediaSelectorOpen] = useState(false)
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSuggestions, setAiSuggestions] = useState<{
+    titles: string[]
+    meta_description: string
+    hashtags: string
+  } | null>(null)
 
   useEffect(() => {
     getMediaAssets().then(setMediaAssets).catch(console.error)
@@ -239,6 +247,29 @@ export default function Studio() {
   }
 
   const showEditor = isCreating || editingPost
+
+  const handleAiAssist = async () => {
+    const content = watch('content')
+    if (!content || content.length < 15) {
+      toast({ title: 'Atenção', description: 'Escreva mais conteúdo para a IA analisar.' })
+      return
+    }
+    setIsAIAssistantOpen(true)
+    setAiLoading(true)
+    setAiSuggestions(null)
+    try {
+      const res = await pb.send('/backend/v1/ai/editor', {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      })
+      setAiSuggestions(res)
+    } catch (err) {
+      toast({ title: 'Erro', description: 'Falha ao processar com IA.', variant: 'destructive' })
+      setIsAIAssistantOpen(false)
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   return (
     <div className="flex h-full w-full overflow-hidden flex-col bg-background">
@@ -528,9 +559,21 @@ export default function Studio() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                      Corpo do Texto (Suporta HTML)
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                        Corpo do Texto (Suporta HTML)
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs bg-brand-forest/10 text-brand-forest border-brand-forest/20 hover:bg-brand-forest hover:text-white"
+                        onClick={handleAiAssist}
+                      >
+                        <Sparkles className="w-3 h-3 mr-2" />
+                        Assistente IA
+                      </Button>
+                    </div>
                     <Textarea
                       {...register('content')}
                       placeholder="<p>Escreva o texto principal aqui...</p>"
@@ -626,6 +669,62 @@ export default function Studio() {
                 </div>
               </div>
             </div>
+
+            <Dialog open={isAIAssistantOpen} onOpenChange={setIsAIAssistantOpen}>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-brand-forest" />
+                    Editor Estratégico IA
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                  {aiLoading ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-4">
+                      <Loader2 className="w-8 h-8 animate-spin text-brand-forest" />
+                      <p className="text-sm">
+                        Analisando o conteúdo e gerando recomendações SEO...
+                      </p>
+                    </div>
+                  ) : aiSuggestions ? (
+                    <div className="space-y-6">
+                      <div className="space-y-3">
+                        <Label className="font-bold text-sm">Títulos Sugeridos (SEO)</Label>
+                        <div className="grid gap-2">
+                          {aiSuggestions.titles.map((t, i) => (
+                            <div key={i} className="flex gap-2 items-center">
+                              <div className="flex-1 p-3 border rounded-md text-sm bg-muted/20 font-serif">
+                                {t}
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setValue('title', t)}
+                              >
+                                Usar
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="font-bold text-sm">Meta-Description Sugerida</Label>
+                        <div className="p-3 border rounded-md text-sm bg-muted/20 text-muted-foreground">
+                          {aiSuggestions.meta_description}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="font-bold text-sm">Hashtags para Redes Sociais</Label>
+                        <div className="p-3 border rounded-md text-sm bg-muted/20 text-brand-forest font-medium">
+                          {aiSuggestions.hashtags}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Mobile Tab Switcher */}
             <div className="xl:hidden absolute bottom-6 right-6 z-50">

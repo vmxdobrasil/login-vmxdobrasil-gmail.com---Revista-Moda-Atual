@@ -23,6 +23,7 @@ import {
 import useEditorStore from '@/stores/use-editor-store'
 import { ExportDialog } from './ExportDialog'
 import { useAuth } from '@/hooks/use-auth'
+import { Chatbot } from './Chatbot'
 
 export default function Layout() {
   const location = useLocation()
@@ -129,6 +130,7 @@ export default function Layout() {
         </main>
       </div>
       <ExportDialog />
+      <Chatbot />
     </SidebarProvider>
   )
 }

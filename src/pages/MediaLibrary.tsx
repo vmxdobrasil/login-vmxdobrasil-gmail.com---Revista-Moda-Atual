@@ -17,11 +17,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Trash2, Upload, Image as ImageIcon } from 'lucide-react'
+import { Trash2, Upload, Image as ImageIcon, Sparkles } from 'lucide-react'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
 
 export default function MediaLibrary() {
+  const [aiAltLoading, setAiAltLoading] = useState(false)
   const [assets, setAssets] = useState<MediaAsset[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -108,12 +109,61 @@ export default function MediaLibrary() {
                   <Input name="title" required placeholder="Ex: Capa Verão 2026" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Texto Alternativo (Acessibilidade)</Label>
-                  <Input name="alt_text" placeholder="Ex: Modelo sorrindo com vestido amarelo" />
+                  <Label>Arquivo</Label>
+                  <Input type="file" id="media_file" name="file" accept="image/*" required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Arquivo</Label>
-                  <Input type="file" name="file" accept="image/*" required />
+                  <div className="flex justify-between items-center">
+                    <Label>Texto Alternativo (Acessibilidade)</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs text-brand-forest hover:text-brand-forest/80 px-2"
+                      onClick={() => {
+                        const fileInput = document.getElementById('media_file') as HTMLInputElement
+                        const file = fileInput?.files?.[0]
+                        if (!file) {
+                          toast({
+                            title: 'Atenção',
+                            description: 'Selecione um arquivo de imagem primeiro.',
+                          })
+                          return
+                        }
+                        setAiAltLoading(true)
+                        const reader = new FileReader()
+                        reader.onload = async (e) => {
+                          try {
+                            const res = await pb.send('/backend/v1/ai/alt-text', {
+                              method: 'POST',
+                              body: JSON.stringify({ image: e.target?.result }),
+                            })
+                            const altInput = document.getElementById('alt_text') as HTMLInputElement
+                            if (altInput) altInput.value = res.alt_text
+                            toast({ title: 'Sucesso', description: 'Alt-text gerado com IA!' })
+                          } catch (err) {
+                            toast({
+                              title: 'Erro',
+                              description: 'Falha ao gerar.',
+                              variant: 'destructive',
+                            })
+                          } finally {
+                            setAiAltLoading(false)
+                          }
+                        }
+                        reader.readAsDataURL(file)
+                      }}
+                      disabled={aiAltLoading}
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      {aiAltLoading ? 'Gerando...' : 'Gerar com IA'}
+                    </Button>
+                  </div>
+                  <Input
+                    name="alt_text"
+                    id="alt_text"
+                    placeholder="Ex: Modelo sorrindo com vestido amarelo"
+                  />
                 </div>
                 <div className="flex justify-end pt-4">
                   <Button type="submit" disabled={isUploading}>
