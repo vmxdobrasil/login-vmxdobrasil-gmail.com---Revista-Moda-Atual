@@ -16,7 +16,15 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Edit, Trash2, X, Check, Eye, Edit2 } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Check, Eye, Edit2, Image as ImageIcon } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { getMediaAssets, MediaAsset } from '@/services/media_assets'
 import { PostPreviewLayout } from '@/components/studio/layouts'
 import { useToast } from '@/hooks/use-toast'
 import { z } from 'zod'
@@ -51,6 +59,7 @@ const formSchema = z.object({
     'sacoleira',
   ]),
   is_published: z.boolean().default(false),
+  status: z.enum(['draft', 'review', 'published']).default('draft'),
 })
 
 type FormDataType = z.infer<typeof formSchema>
@@ -75,6 +84,12 @@ export default function Studio() {
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
+  const [isMediaSelectorOpen, setIsMediaSelectorOpen] = useState(false)
+
+  useEffect(() => {
+    getMediaAssets().then(setMediaAssets).catch(console.error)
+  }, [])
 
   const {
     register,
@@ -93,6 +108,7 @@ export default function Studio() {
       content: '',
       type: 'social',
       is_published: false,
+      status: 'draft',
     },
   })
 
@@ -145,6 +161,7 @@ export default function Studio() {
       content: '<p></p>',
       type: initialType,
       is_published: false,
+      status: 'draft',
     })
   }
 
@@ -160,6 +177,7 @@ export default function Studio() {
       content: post.content,
       type: post.type,
       is_published: post.is_published,
+      status: post.status || 'draft',
     })
   }
 
@@ -193,6 +211,7 @@ export default function Studio() {
     formData.append('content', data.content)
     formData.append('type', data.type)
     formData.append('is_published', String(data.is_published))
+    formData.append('status', data.status)
     if (imageFile) {
       formData.append('main_image', imageFile)
     }
@@ -284,9 +303,13 @@ export default function Studio() {
                   </div>
                   <div className="flex items-center justify-between border-t pt-3">
                     <span
-                      className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${post.is_published ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}
+                      className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${post.status === 'published' ? 'bg-green-100 text-green-700 border border-green-200' : post.status === 'review' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}
                     >
-                      {post.is_published ? 'Publicado' : 'Rascunho'}
+                      {post.status === 'published'
+                        ? 'Publicado'
+                        : post.status === 'review'
+                          ? 'Em Revisão'
+                          : 'Rascunho'}
                     </span>
                     {user && (
                       <Button
@@ -415,25 +438,91 @@ export default function Studio() {
                     <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
                       Imagem Principal
                     </Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) {
-                          setImageFile(file)
-                          setImagePreview(URL.createObjectURL(file))
-                        }
-                      }}
-                      className="cursor-pointer file:text-brand-forest file:font-semibold"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setImageFile(file)
+                            setImagePreview(URL.createObjectURL(file))
+                          }
+                        }}
+                        className="cursor-pointer file:text-brand-forest file:font-semibold flex-1"
+                      />
+                      <Dialog open={isMediaSelectorOpen} onOpenChange={setIsMediaSelectorOpen}>
+                        <DialogTrigger asChild>
+                          <Button type="button" variant="outline" className="px-3 shrink-0">
+                            <ImageIcon className="w-4 h-4 mr-2" /> Galeria
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-3xl">
+                          <DialogHeader>
+                            <DialogTitle>Biblioteca de Mídia</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto p-2">
+                            {mediaAssets.map((asset) => (
+                              <div
+                                key={asset.id}
+                                className="cursor-pointer border rounded overflow-hidden aspect-square hover:ring-2 hover:ring-brand-forest transition-all"
+                                onClick={async () => {
+                                  try {
+                                    const url = pb.files.getURL(asset, asset.file)
+                                    const response = await fetch(url)
+                                    const blob = await response.blob()
+                                    const file = new File([blob], asset.file || 'image.jpg', {
+                                      type: blob.type,
+                                    })
+                                    setImageFile(file)
+                                    setImagePreview(url)
+                                    setIsMediaSelectorOpen(false)
+                                  } catch (error) {
+                                    console.error('Failed to load image from library', error)
+                                  }
+                                }}
+                              >
+                                {asset.file ? (
+                                  <img
+                                    src={pb.files.getURL(asset, asset.file)}
+                                    alt={asset.alt_text}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                                    Sem Imagem
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {mediaAssets.length === 0 && (
+                              <p className="col-span-full text-center text-muted-foreground text-sm">
+                                Nenhuma mídia encontrada.
+                              </p>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                     {imagePreview && (
-                      <div className="mt-2 w-32 h-32 rounded-md overflow-hidden border bg-muted/20">
+                      <div className="mt-2 w-32 h-32 rounded-md overflow-hidden border bg-muted/20 relative">
                         <img
                           src={imagePreview}
                           alt="Preview"
                           className="w-full h-full object-cover"
                         />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6"
+                          onClick={() => {
+                            setImageFile(null)
+                            setImagePreview(null)
+                          }}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -454,20 +543,21 @@ export default function Studio() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between border p-5 rounded-lg bg-muted/20">
+                  <div className="flex flex-col gap-3 border p-5 rounded-lg bg-muted/20">
                     <div>
-                      <Label className="text-base font-bold">Aprovação Editorial</Label>
+                      <Label className="text-base font-bold">Status Editorial</Label>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Ao marcar como publicado, o post vai para a capa do site.
+                        Apenas matérias marcadas como "Publicado" aparecem no site e link na bio.
                       </p>
                     </div>
-                    <Controller
-                      control={control}
-                      name="is_published"
-                      render={({ field }) => (
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      )}
-                    />
+                    <select
+                      {...register('status')}
+                      className="w-full border rounded-md p-3 text-sm bg-background outline-none focus:ring-2 focus:ring-brand-forest"
+                    >
+                      <option value="draft">Rascunho</option>
+                      <option value="review">Em Revisão</option>
+                      <option value="published">Publicado</option>
+                    </select>
                   </div>
                 </form>
               </ScrollArea>

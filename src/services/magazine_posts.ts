@@ -9,6 +9,7 @@ export interface MagazinePost {
   type: 'social' | 'trends' | 'interview' | 'marketing' | 'style' | 'brand_history' | 'sacoleira'
   main_image: string
   is_published: boolean
+  status: 'draft' | 'review' | 'published'
   created: string
   updated: string
 }

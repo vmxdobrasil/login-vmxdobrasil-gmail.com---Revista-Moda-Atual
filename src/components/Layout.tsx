@@ -10,7 +10,16 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { LayoutTemplate, MonitorPlay, Download, BookOpen, LogOut, LogIn } from 'lucide-react'
+import {
+  LayoutTemplate,
+  MonitorPlay,
+  Download,
+  BookOpen,
+  LogOut,
+  LogIn,
+  Image as ImageIcon,
+  Calendar,
+} from 'lucide-react'
 import useEditorStore from '@/stores/use-editor-store'
 import { ExportDialog } from './ExportDialog'
 import { useAuth } from '@/hooks/use-auth'
@@ -52,6 +61,22 @@ export default function Layout() {
                   <Link to="/studio">
                     <BookOpen className="w-4 h-4" />
                     <span>Editoria (Studio)</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location.pathname === '/media'}>
+                  <Link to="/media">
+                    <ImageIcon className="w-4 h-4" />
+                    <span>Biblioteca de Mídia</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location.pathname === '/events'}>
+                  <Link to="/events">
+                    <Calendar className="w-4 h-4" />
+                    <span>Eventos</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
