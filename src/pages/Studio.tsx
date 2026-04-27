@@ -16,12 +16,14 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Edit, Trash2, X, Check } from 'lucide-react'
+import { Plus, Edit, Trash2, X, Check, Eye, Edit2 } from 'lucide-react'
 import { PostPreviewLayout } from '@/components/studio/layouts'
 import { useToast } from '@/hooks/use-toast'
 import { z } from 'zod'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import pb from '@/lib/pocketbase/client'
+import { cn } from '@/lib/utils'
 
 const SECTIONS = [
   { id: 'all', label: 'Todas' },
@@ -51,7 +53,16 @@ const formSchema = z.object({
   is_published: z.boolean().default(false),
 })
 
-type FormData = z.infer<typeof formSchema>
+type FormDataType = z.infer<typeof formSchema>
+
+const PREVIEW_FORMATS = [
+  { id: 'web', label: 'Web', className: 'w-full h-full' },
+  { id: 'magazine', label: 'Revista (3:4)', className: 'w-[min(100%,600px)] aspect-[3/4]' },
+  { id: 'ig_square', label: 'Instagram (1:1)', className: 'w-[min(100%,500px)] aspect-square' },
+  { id: 'ig_portrait', label: 'Instagram (4:5)', className: 'w-[min(100%,480px)] aspect-[4/5]' },
+  { id: 'stories', label: 'Stories (9:16)', className: 'h-[min(100%,800px)] aspect-[9/16]' },
+  { id: 'linkedin', label: 'LinkedIn (1.91:1)', className: 'w-[min(100%,800px)] aspect-[1.91/1]' },
+]
 
 export default function Studio() {
   const { user } = useAuth()
@@ -60,6 +71,10 @@ export default function Studio() {
   const [selectedSection, setSelectedSection] = useState<string>('all')
   const [editingPost, setEditingPost] = useState<MagazinePost | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [previewFormat, setPreviewFormat] = useState<string>('web')
+  const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
 
   const {
     register,
@@ -69,7 +84,7 @@ export default function Studio() {
     setValue,
     watch,
     formState: { errors },
-  } = useForm<FormData>({
+  } = useForm<FormDataType>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: '',
@@ -115,6 +130,8 @@ export default function Studio() {
   const handleNew = () => {
     setIsCreating(true)
     setEditingPost(null)
+    setImageFile(null)
+    setImagePreview(null)
     const initialType = selectedSection !== 'all' ? (selectedSection as any) : 'social'
     reset({
       title: '',
@@ -134,6 +151,8 @@ export default function Studio() {
   const handleEdit = (post: MagazinePost) => {
     setIsCreating(false)
     setEditingPost(post)
+    setImageFile(null)
+    setImagePreview(post.main_image ? pb.files.getURL(post, post.main_image) : null)
     reset({
       title: post.title,
       subtitle: post.subtitle || '',
@@ -157,7 +176,7 @@ export default function Studio() {
     }
   }
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = async (data: FormDataType) => {
     if (!user) {
       toast({
         title: 'Acesso Negado',
@@ -167,16 +186,29 @@ export default function Studio() {
       return
     }
 
+    const formData = new FormData()
+    formData.append('title', data.title)
+    formData.append('subtitle', data.subtitle || '')
+    formData.append('author', data.author)
+    formData.append('content', data.content)
+    formData.append('type', data.type)
+    formData.append('is_published', String(data.is_published))
+    if (imageFile) {
+      formData.append('main_image', imageFile)
+    }
+
     try {
       if (editingPost) {
-        await updatePost(editingPost.id, data)
+        await updatePost(editingPost.id, formData)
         toast({ title: 'Sucesso', description: 'Post atualizado.' })
       } else {
-        await createPost(data)
+        await createPost(formData)
         toast({ title: 'Sucesso', description: 'Novo post adicionado à edição.' })
       }
       setIsCreating(false)
       setEditingPost(null)
+      setImageFile(null)
+      setImagePreview(null)
     } catch (err) {
       const fieldErrors = extractFieldErrors(err)
       toast({
@@ -283,8 +315,13 @@ export default function Studio() {
 
         {/* Editor Area */}
         {showEditor ? (
-          <div className="flex-1 flex overflow-hidden bg-muted/10">
-            <div className="w-full xl:w-1/2 border-r bg-card flex flex-col shadow-lg z-10">
+          <div className="flex-1 flex overflow-hidden bg-muted/10 relative">
+            <div
+              className={cn(
+                'w-full xl:w-1/2 border-r bg-card flex flex-col shadow-lg z-10',
+                mobileTab !== 'form' && 'hidden xl:flex',
+              )}
+            >
               <div className="p-4 border-b flex justify-between items-center shrink-0 bg-muted/30">
                 <h2 className="font-serif font-bold text-lg">
                   {isCreating ? 'Escrever Nova Matéria' : 'Revisar Matéria'}
@@ -376,6 +413,33 @@ export default function Studio() {
 
                   <div className="space-y-2">
                     <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                      Imagem Principal
+                    </Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setImageFile(file)
+                          setImagePreview(URL.createObjectURL(file))
+                        }
+                      }}
+                      className="cursor-pointer file:text-brand-forest file:font-semibold"
+                    />
+                    {imagePreview && (
+                      <div className="mt-2 w-32 h-32 rounded-md overflow-hidden border bg-muted/20">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
                       Corpo do Texto (Suporta HTML)
                     </Label>
                     <Textarea
@@ -407,7 +471,7 @@ export default function Studio() {
                   </div>
                 </form>
               </ScrollArea>
-              <div className="p-4 border-t shrink-0 flex justify-end gap-3 bg-card">
+              <div className="p-4 border-t shrink-0 flex justify-end gap-3 bg-card pb-20 xl:pb-4">
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -428,19 +492,60 @@ export default function Studio() {
               </div>
             </div>
 
-            <div className="hidden xl:flex w-1/2 bg-[#EAEAEA] flex-col">
-              <div className="p-3 border-b bg-card shrink-0 flex justify-center shadow-sm z-10">
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                  Mockup da Página
-                </span>
+            <div
+              className={cn(
+                'w-full xl:w-1/2 bg-[#EAEAEA] flex-col',
+                mobileTab !== 'preview' && 'hidden xl:flex',
+              )}
+            >
+              <div className="p-3 border-b bg-card shrink-0 flex flex-col gap-3 shadow-sm z-10">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    Visualização: {PREVIEW_FORMATS.find((f) => f.id === previewFormat)?.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {PREVIEW_FORMATS.map((f) => (
+                    <Button
+                      key={f.id}
+                      type="button"
+                      variant={previewFormat === f.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPreviewFormat(f.id)}
+                      className="text-xs whitespace-nowrap h-7 rounded-full"
+                    >
+                      {f.label}
+                    </Button>
+                  ))}
+                </div>
               </div>
-              <ScrollArea className="flex-1">
-                <div className="p-8 pb-32">
-                  <div className="animate-fade-in-up">
-                    <PostPreviewLayout post={watchAll as any} />
+              <div className="flex-1 overflow-hidden relative flex items-center justify-center p-4">
+                <div
+                  className={cn(
+                    'bg-white shadow-elevation overflow-y-auto transition-all duration-500 ease-in-out [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
+                    PREVIEW_FORMATS.find((f) => f.id === previewFormat)?.className,
+                  )}
+                >
+                  <div className="animate-fade-in min-h-full">
+                    <PostPreviewLayout
+                      post={watchAll as any}
+                      imageUrl={imagePreview}
+                      format={previewFormat}
+                    />
                   </div>
                 </div>
-              </ScrollArea>
+              </div>
+            </div>
+
+            {/* Mobile Tab Switcher */}
+            <div className="xl:hidden absolute bottom-6 right-6 z-50">
+              <Button
+                size="icon"
+                className="h-14 w-14 rounded-full shadow-elevation bg-brand-forest hover:bg-brand-forest/90 text-white"
+                onClick={() => setMobileTab(mobileTab === 'form' ? 'preview' : 'form')}
+              >
+                {mobileTab === 'form' ? <Eye className="w-6 h-6" /> : <Edit2 className="w-6 h-6" />}
+              </Button>
             </div>
           </div>
         ) : (

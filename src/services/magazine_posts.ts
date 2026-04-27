@@ -16,8 +16,8 @@ export interface MagazinePost {
 export const getPosts = () =>
   pb.collection('magazine_posts').getFullList<MagazinePost>({ sort: '-created' })
 export const getPost = (id: string) => pb.collection('magazine_posts').getOne<MagazinePost>(id)
-export const createPost = (data: Partial<MagazinePost>) =>
+export const createPost = (data: Partial<MagazinePost> | FormData) =>
   pb.collection('magazine_posts').create<MagazinePost>(data)
-export const updatePost = (id: string, data: Partial<MagazinePost>) =>
+export const updatePost = (id: string, data: Partial<MagazinePost> | FormData) =>
   pb.collection('magazine_posts').update<MagazinePost>(id, data)
 export const deletePost = (id: string) => pb.collection('magazine_posts').delete(id)
