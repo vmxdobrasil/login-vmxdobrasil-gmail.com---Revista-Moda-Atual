@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-28T18:28:55.212Z",
+  "generatedAt": "2026-04-28T18:36:13.978Z",
   "collections": [
     {
       "name": "users",
@@ -258,6 +258,19 @@
         {
           "name": "display_order",
           "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["Desfile", "Festa", "Tapete Vermelho", "Outros"]
+        },
+        {
+          "name": "gallery_data",
+          "type": "json",
           "required": false,
           "system": false
         }

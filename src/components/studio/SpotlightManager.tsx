@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
-import { FashionEvent } from '@/services/fashion_events'
-import { getMediaAssets, MediaAsset } from '@/services/media_assets'
+import {
+  FashionEvent,
+  getEvents,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+} from '@/services/fashion_events'
 import { useRealtime } from '@/hooks/use-realtime'
 import pb from '@/lib/pocketbase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Card, CardContent } from '@/components/ui/card'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Dialog,
   DialogContent,
@@ -17,89 +22,133 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { ImageIcon, Save, Trash2, UploadCloud, Star } from 'lucide-react'
+import { Plus, Save, Trash2, Edit, X, ImageIcon, UploadCloud, Calendar } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
-type SlotData = {
-  id?: string
+const CATEGORIES = ['Desfile', 'Festa', 'Tapete Vermelho', 'Outros']
+
+type GalleryItem = {
   title: string
   description: string
-  imageFile?: File
   imageUrl?: string
+  imageFile?: File
+  id: string
 }
 
 export function SpotlightManager() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [slots, setSlots] = useState<SlotData[]>(Array(5).fill({ title: '', description: '' }))
-  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
+  const [events, setEvents] = useState<FashionEvent[]>([])
+  const [editing, setEditing] = useState<Partial<FashionEvent> | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [activeSlot, setActiveSlot] = useState<number | null>(null)
-  const [mainIndex, setMainIndex] = useState<number>(0)
 
-  const loadSlots = async () => {
+  const [mainImageFile, setMainImageFile] = useState<File | null>(null)
+  const [mainImagePreview, setMainImagePreview] = useState<string | null>(null)
+  const [gallery, setGallery] = useState<GalleryItem[]>([])
+
+  const loadEvents = async () => {
     try {
-      const events = await pb.collection('fashion_events').getFullList<FashionEvent>({
-        filter: 'display_order > 0',
-        sort: 'display_order',
-      })
-      const newSlots = Array(5)
-        .fill(null)
-        .map((_, i) => {
-          const ev = events.find((e) => e.display_order === i + 1)
-          if (ev) {
-            if (ev.is_spotlight) setMainIndex(i)
-            return {
-              id: ev.id,
-              title: ev.title,
-              description: ev.description || '',
-              imageUrl: ev.image ? pb.files.getURL(ev, ev.image) : undefined,
-            }
-          }
-          return { title: '', description: '' }
-        })
-      setSlots(newSlots)
+      const data = await getEvents()
+      setEvents(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
     } catch (err) {
       console.error(err)
     }
   }
 
   useEffect(() => {
-    loadSlots()
-    getMediaAssets().then(setMediaAssets).catch(console.error)
+    loadEvents()
   }, [])
-  useRealtime('fashion_events', loadSlots)
+  useRealtime('fashion_events', loadEvents)
 
-  const updateSlot = (i: number, data: Partial<SlotData>) => {
-    const newSlots = [...slots]
-    newSlots[i] = { ...newSlots[i], ...data }
-    setSlots(newSlots)
+  const handleEdit = (ev: FashionEvent) => {
+    setEditing(ev)
+    setIsCreating(false)
+    setMainImageFile(null)
+    setMainImagePreview(ev.image ? pb.files.getURL(ev, ev.image) : null)
+
+    const gd = (ev.gallery_data as any[]) || []
+    setGallery(
+      gd.map((g, i) => ({
+        id: Math.random().toString(),
+        title: g.title || '',
+        description: g.description || '',
+        imageUrl: g.imageUrl || '',
+      })),
+    )
+  }
+
+  const handleNew = () => {
+    setEditing({
+      title: '',
+      description: '',
+      category: 'Outros',
+      is_spotlight: false,
+      date: new Date().toISOString().split('T')[0],
+    })
+    setIsCreating(true)
+    setMainImageFile(null)
+    setMainImagePreview(null)
+    setGallery([])
   }
 
   const handleSave = async () => {
-    if (!user) return toast({ title: 'Acesso Negado', variant: 'destructive' })
+    if (!editing?.title || !editing?.date) {
+      return toast({
+        title: 'Atenção',
+        description: 'Título e data são obrigatórios',
+        variant: 'destructive',
+      })
+    }
     setSaving(true)
     try {
-      for (let i = 0; i < 5; i++) {
-        const s = slots[i]
-        if (s.title.trim() || s.imageFile || s.imageUrl) {
-          const fd = new FormData()
-          fd.append('title', s.title || `Holofote ${i + 1}`)
-          fd.append('description', s.description)
-          fd.append('is_spotlight', String(i === mainIndex))
-          fd.append('display_order', String(i + 1))
-          if (!s.id) fd.append('date', new Date().toISOString())
-          if (s.imageFile) fd.append('image', s.imageFile)
-          if (s.id) await pb.collection('fashion_events').update(s.id, fd)
-          else await pb.collection('fashion_events').create(fd)
-        } else if (s.id) {
-          await pb
-            .collection('fashion_events')
-            .update(s.id, { is_spotlight: false, display_order: 0 })
+      const fd = new FormData()
+      fd.append('title', editing.title)
+      fd.append('description', editing.description || '')
+      fd.append('date', editing.date)
+      fd.append('category', editing.category || 'Outros')
+      fd.append('is_spotlight', String(editing.is_spotlight || false))
+
+      if (mainImageFile) fd.append('image', mainImageFile)
+
+      // Upload gallery files first if any
+      const finalGalleryData = []
+      for (const item of gallery) {
+        let finalUrl = item.imageUrl
+        if (item.imageFile) {
+          const mediaFd = new FormData()
+          mediaFd.append('file', item.imageFile)
+          mediaFd.append('title', `Gallery: ${item.title}`)
+          const asset = await pb.collection('media_assets').create(mediaFd)
+          finalUrl = pb.files.getURL(asset, asset.file)
+        }
+        finalGalleryData.push({
+          title: item.title,
+          description: item.description,
+          imageUrl: finalUrl,
+        })
+      }
+
+      fd.append('gallery_data', JSON.stringify(finalGalleryData))
+
+      if (editing.is_spotlight) {
+        // Unset others
+        const currentSpotlights = events.filter((e) => e.is_spotlight && e.id !== editing.id)
+        for (const cs of currentSpotlights) {
+          await updateEvent(cs.id, { is_spotlight: false })
         }
       }
-      toast({ title: 'Sucesso', description: 'Coluna Holofote atualizada.' })
-      loadSlots()
+
+      if (isCreating) {
+        await createEvent(fd)
+        toast({ title: 'Sucesso', description: 'Cobertura criada.' })
+      } else if (editing.id) {
+        await updateEvent(editing.id, fd)
+        toast({ title: 'Sucesso', description: 'Cobertura atualizada.' })
+      }
+
+      setEditing(null)
     } catch (err) {
       toast({ title: 'Erro', description: 'Falha ao salvar.', variant: 'destructive' })
     } finally {
@@ -107,151 +156,273 @@ export function SpotlightManager() {
     }
   }
 
-  return (
-    <div className="flex flex-col h-full bg-muted/10">
-      <div className="p-6 border-b bg-card flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h2 className="font-serif text-2xl font-bold">Coluna: HOLOFOTE</h2>
-          <p className="text-sm text-muted-foreground">
-            Colunista: Fabia Mendonça. Gerencie até 5 registros.
-          </p>
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir cobertura?')) return
+    await deleteEvent(id)
+    if (editing?.id === id) setEditing(null)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex flex-col h-full bg-muted/10 overflow-hidden">
+        <div className="p-4 border-b bg-card flex justify-between items-center shrink-0">
+          <h2 className="font-serif font-bold text-xl">
+            {isCreating ? 'Nova Cobertura' : 'Editar Cobertura'}
+          </h2>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setEditing(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving} className="bg-brand-forest text-white">
+              <Save className="w-4 h-4 mr-2" /> Salvar
+            </Button>
+          </div>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="bg-brand-forest text-white">
-          <Save className="w-4 h-4 mr-2" /> Salvar Alterações
-        </Button>
-      </div>
-      <div className="p-6 overflow-y-auto">
-        <RadioGroup
-          value={String(mainIndex)}
-          onValueChange={(v) => setMainIndex(parseInt(v))}
-          className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6"
-        >
-          {slots.map((slot, i) => (
-            <Card
-              key={i}
-              className={`overflow-hidden flex flex-col transition-all bg-card ${mainIndex === i ? 'ring-2 ring-brand-forest shadow-md' : 'shadow-sm hover:shadow-md'}`}
-            >
-              <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value={String(i)} id={`r-${i}`} />
-                  <Label htmlFor={`r-${i}`} className="text-xs font-bold uppercase cursor-pointer">
-                    {mainIndex === i ? 'Destaque Principal' : `Secundário ${i + 1}`}
-                  </Label>
+        <ScrollArea className="flex-1 p-6">
+          <div className="max-w-4xl mx-auto space-y-8 pb-12">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg font-serif">Informações Principais</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Título do Evento</Label>
+                    <Input
+                      value={editing.title}
+                      onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Categoria</Label>
+                    <select
+                      className="w-full border rounded-md p-2 text-sm bg-transparent"
+                      value={editing.category}
+                      onChange={(e) => setEditing({ ...editing, category: e.target.value as any })}
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                {mainIndex === i && (
-                  <Star className="w-4 h-4 text-brand-forest fill-brand-forest" />
-                )}
-              </div>
-              <div className="aspect-[4/5] bg-muted relative group flex items-center justify-center border-b">
-                {slot.imageFile || slot.imageUrl ? (
-                  <img
-                    src={slot.imageFile ? URL.createObjectURL(slot.imageFile) : slot.imageUrl}
-                    alt="preview"
-                    className="w-full h-full object-cover"
+                <div className="space-y-2">
+                  <Label>Descrição</Label>
+                  <Textarea
+                    value={editing.description}
+                    onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                    rows={3}
                   />
-                ) : (
-                  <ImageIcon className="w-10 h-10 text-muted-foreground/30" />
-                )}
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                  <Dialog open={activeSlot === i} onOpenChange={(o) => setActiveSlot(o ? i : null)}>
-                    <DialogTrigger asChild>
-                      <Button variant="secondary" size="sm">
-                        <ImageIcon className="w-4 h-4 mr-2" /> Galeria
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-3xl">
-                      <DialogHeader>
-                        <DialogTitle>Selecionar Mídia</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto p-2">
-                        {mediaAssets.map((asset) => (
-                          <div
-                            key={asset.id}
-                            className="cursor-pointer border rounded aspect-square hover:ring-2 hover:ring-brand-forest overflow-hidden"
-                            onClick={async () => {
-                              try {
-                                const url = pb.files.getURL(asset, asset.file)
-                                const res = await fetch(url)
-                                const blob = await res.blob()
-                                updateSlot(i, {
-                                  imageFile: new File([blob], asset.file || 'image.jpg', {
-                                    type: blob.type,
-                                  }),
-                                  imageUrl: url,
-                                })
-                                setActiveSlot(null)
-                              } catch (e) {
-                                console.error(e)
-                              }
-                            }}
-                          >
-                            <img
-                              src={pb.files.getURL(asset, asset.file)}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                  <div className="relative">
-                    <Button variant="secondary" size="sm">
-                      <UploadCloud className="w-4 h-4 mr-2" /> Upload
-                    </Button>
-                    <input
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                  <div className="space-y-2">
+                    <Label>Data do Evento</Label>
+                    <Input
+                      type="date"
+                      value={editing.date ? editing.date.split('T')[0] : ''}
+                      onChange={(e) => setEditing({ ...editing, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-4">
+                    <Switch
+                      checked={editing.is_spotlight}
+                      onCheckedChange={(c) => setEditing({ ...editing, is_spotlight: c })}
+                    />
+                    <Label>Destaque Principal (Holofote)</Label>
+                  </div>
+                </div>
+                <div className="space-y-2 pt-2">
+                  <Label>Foto Principal (Capa)</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="w-32 h-32 border rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                      {mainImagePreview ? (
+                        <img src={mainImagePreview} className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
+                      )}
+                    </div>
+                    <Input
                       type="file"
                       accept="image/*"
-                      className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={(e) => {
-                        if (e.target.files?.[0])
-                          updateSlot(i, { imageFile: e.target.files[0], imageUrl: undefined })
+                        if (e.target.files?.[0]) {
+                          setMainImageFile(e.target.files[0])
+                          setMainImagePreview(URL.createObjectURL(e.target.files[0]))
+                        }
                       }}
+                      className="max-w-xs"
                     />
                   </div>
                 </div>
-              </div>
-              <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    Nomes / Legenda
-                  </Label>
-                  <Input
-                    placeholder="Ex: Gisele & Paulo"
-                    value={slot.title}
-                    onChange={(e) => updateSlot(i, { title: e.target.value })}
-                    className="font-serif font-bold text-base h-9 focus-visible:ring-brand-forest"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                    Descrição
-                  </Label>
-                  <Textarea
-                    placeholder="Contexto da foto..."
-                    value={slot.description}
-                    onChange={(e) => updateSlot(i, { description: e.target.value })}
-                    className="h-16 resize-none text-sm focus-visible:ring-brand-forest"
-                  />
-                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-lg font-serif">Galeria de Fotos (Secundárias)</CardTitle>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="mt-auto text-red-500 hover:bg-red-50 w-full"
                   onClick={() =>
-                    updateSlot(i, {
-                      title: '',
-                      description: '',
-                      imageFile: undefined,
-                      imageUrl: undefined,
-                    })
+                    setGallery([
+                      ...gallery,
+                      { id: Math.random().toString(), title: '', description: '' },
+                    ])
                   }
                 >
-                  <Trash2 className="w-4 h-4 mr-2" /> Limpar Slot
+                  <Plus className="w-4 h-4 mr-2" /> Adicionar Foto
                 </Button>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {gallery.map((item, index) => (
+                  <div
+                    key={item.id}
+                    className="flex gap-4 p-4 border rounded-lg bg-muted/5 relative"
+                  >
+                    <div className="w-24 h-32 shrink-0 border rounded-md bg-muted overflow-hidden flex items-center justify-center relative group">
+                      {item.imageFile || item.imageUrl ? (
+                        <img
+                          src={item.imageFile ? URL.createObjectURL(item.imageFile) : item.imageUrl}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="w-6 h-6 text-muted-foreground/30" />
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                        <UploadCloud className="w-6 h-6 text-white" />
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          if (e.target.files?.[0]) {
+                            const newG = [...gallery]
+                            newG[index].imageFile = e.target.files[0]
+                            setGallery(newG)
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1 space-y-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Pessoas na Foto (Nomes)</Label>
+                        <Input
+                          value={item.title}
+                          onChange={(e) => {
+                            const newG = [...gallery]
+                            newG[index].title = e.target.value
+                            setGallery(newG)
+                          }}
+                          placeholder="Ex: Gisele & Paulo"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Descrição / Contexto</Label>
+                        <Input
+                          value={item.description}
+                          onChange={(e) => {
+                            const newG = [...gallery]
+                            newG[index].description = e.target.value
+                            setGallery(newG)
+                          }}
+                          placeholder="Looks, marcas..."
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 text-red-500"
+                      onClick={() => setGallery(gallery.filter((g) => g.id !== item.id))}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                {gallery.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Nenhuma foto adicionada à galeria.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </ScrollArea>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-muted/10">
+      <div className="p-6 border-b bg-card flex justify-between items-center shrink-0">
+        <div>
+          <h2 className="font-serif text-2xl font-bold">Acervo Holofote</h2>
+          <p className="text-sm text-muted-foreground">Gerencie as coberturas de eventos.</p>
+        </div>
+        <Button onClick={handleNew} className="bg-brand-forest text-white">
+          <Plus className="w-4 h-4 mr-2" /> Nova Cobertura
+        </Button>
+      </div>
+      <div className="p-6 overflow-y-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {events.map((ev) => (
+            <Card
+              key={ev.id}
+              className={`overflow-hidden hover:shadow-md transition-all ${ev.is_spotlight ? 'ring-2 ring-brand-forest' : ''}`}
+            >
+              <div className="aspect-video bg-muted relative">
+                {ev.image ? (
+                  <img src={pb.files.getURL(ev, ev.image)} className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="w-10 h-10 m-auto mt-10 text-muted-foreground/30" />
+                )}
+                {ev.is_spotlight && (
+                  <span className="absolute top-2 left-2 bg-brand-forest text-white text-xs font-bold px-2 py-1 uppercase rounded-sm">
+                    Destaque Atual
+                  </span>
+                )}
+                <span className="absolute top-2 right-2 bg-black/60 text-white text-[10px] px-2 py-1 uppercase tracking-wider rounded-sm backdrop-blur-sm">
+                  {ev.category}
+                </span>
+              </div>
+              <CardContent className="p-4">
+                <h3 className="font-serif font-bold text-lg leading-tight line-clamp-2">
+                  {ev.title}
+                </h3>
+                <div className="flex items-center text-xs text-muted-foreground mt-2 uppercase tracking-wider">
+                  <Calendar className="w-3 h-3 mr-1" />{' '}
+                  {new Date(ev.date).toLocaleDateString('pt-BR')}
+                </div>
+                <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleEdit(ev)}
+                  >
+                    <Edit className="w-4 h-4 mr-2" /> Editar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-red-500 hover:bg-red-50"
+                    onClick={() => handleDelete(ev.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
-        </RadioGroup>
+          {events.length === 0 && (
+            <p className="col-span-full text-center text-muted-foreground py-10">
+              Nenhuma cobertura encontrada.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )

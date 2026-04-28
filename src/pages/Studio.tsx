@@ -27,6 +27,7 @@ import {
 import { getMediaAssets, MediaAsset } from '@/services/media_assets'
 import { PostPreviewLayout } from '@/components/studio/layouts'
 import { SpotlightManager } from '@/components/studio/SpotlightManager'
+import { LeadsDashboard } from '@/components/studio/LeadsDashboard'
 import { useToast } from '@/hooks/use-toast'
 import { z } from 'zod'
 import { Sparkles, Loader2 } from 'lucide-react'
@@ -78,7 +79,7 @@ const PREVIEW_FORMATS = [
 export default function Studio() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [activeModule, setActiveModule] = useState<'posts' | 'spotlight'>('posts')
+  const [activeModule, setActiveModule] = useState<'posts' | 'spotlight' | 'leads'>('posts')
   const [posts, setPosts] = useState<MagazinePost[]>([])
   const [selectedSection, setSelectedSection] = useState<string>('all')
   const [editingPost, setEditingPost] = useState<MagazinePost | null>(null)
@@ -280,14 +281,17 @@ export default function Studio() {
         <Tabs
           value={activeModule}
           onValueChange={(v) => setActiveModule(v as any)}
-          className="w-full max-w-[400px]"
+          className="w-full max-w-[500px]"
         >
           <TabsList className="w-full h-9">
             <TabsTrigger value="posts" className="flex-1">
               Redação
             </TabsTrigger>
             <TabsTrigger value="spotlight" className="flex-1">
-              Holofote (Destaques)
+              Holofote
+            </TabsTrigger>
+            <TabsTrigger value="leads" className="flex-1">
+              Conversão
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -326,7 +330,11 @@ export default function Studio() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {activeModule === 'spotlight' ? (
+        {activeModule === 'leads' ? (
+          <div className="flex-1 overflow-y-auto bg-muted/10">
+            <LeadsDashboard />
+          </div>
+        ) : activeModule === 'spotlight' ? (
           <div className="flex-1 overflow-y-auto">
             <SpotlightManager />
           </div>
@@ -747,6 +755,51 @@ export default function Studio() {
                             <Label className="font-bold text-sm">Hashtags para Redes Sociais</Label>
                             <div className="p-3 border rounded-md text-sm bg-muted/20 text-brand-forest font-medium">
                               {aiSuggestions.hashtags}
+                            </div>
+                          </div>
+                          <div className="space-y-3 pt-4 border-t">
+                            <Label className="font-bold text-sm flex items-center gap-2">
+                              <ImageIcon className="w-4 h-4" /> Sugestões de Imagens (AI Curation)
+                            </Label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {[1, 2, 3].map((seed) => (
+                                <div
+                                  key={seed}
+                                  className="relative group rounded-md overflow-hidden aspect-video border cursor-pointer hover:ring-2 ring-brand-forest transition-all"
+                                  onClick={async () => {
+                                    const keyword =
+                                      aiSuggestions.hashtags.split(' ')[0]?.replace('#', '') ||
+                                      'fashion'
+                                    const url = `https://img.usecurling.com/p/800/600?q=${encodeURIComponent(keyword)}&seed=${seed}`
+                                    try {
+                                      const res = await fetch(url)
+                                      const blob = await res.blob()
+                                      setImageFile(
+                                        new File([blob], `ai-suggestion-${seed}.jpg`, {
+                                          type: blob.type,
+                                        }),
+                                      )
+                                      setImagePreview(url)
+                                      setIsAIAssistantOpen(false)
+                                      toast({
+                                        title: 'Imagem Selecionada',
+                                        description: 'Imagem da IA aplicada com sucesso.',
+                                      })
+                                    } catch {
+                                      /* intentionally ignored */
+                                    }
+                                  }}
+                                >
+                                  <img
+                                    src={`https://img.usecurling.com/p/800/600?q=${encodeURIComponent(aiSuggestions.hashtags.split(' ')[0]?.replace('#', '') || 'fashion')}&seed=${seed}`}
+                                    className="w-full h-full object-cover"
+                                    alt="AI Suggestion"
+                                  />
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                                    <span className="text-white text-xs font-bold">Usar</span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         </div>

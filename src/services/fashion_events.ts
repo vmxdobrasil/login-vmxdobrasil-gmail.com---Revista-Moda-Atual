@@ -7,6 +7,8 @@ export interface FashionEvent {
   date: string
   location: string
   image: string
+  category?: 'Desfile' | 'Festa' | 'Tapete Vermelho' | 'Outros'
+  gallery_data?: any
   is_spotlight: boolean
   display_order: number
   created: string
