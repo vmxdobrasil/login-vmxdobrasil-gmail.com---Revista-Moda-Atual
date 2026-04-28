@@ -8,6 +8,9 @@ export interface MagazinePost {
   content: string
   type: 'social' | 'trends' | 'interview' | 'marketing' | 'style' | 'brand_history' | 'sacoleira'
   main_image: string
+  gallery?: string[]
+  columnist_bio?: string
+  columnist_photo?: string
   is_published: boolean
   status: 'draft' | 'review' | 'published'
   created: string

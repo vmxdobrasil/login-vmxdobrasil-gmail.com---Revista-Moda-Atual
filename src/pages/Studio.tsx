@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, Edit, Trash2, X, Check, Eye, Edit2, Image as ImageIcon } from 'lucide-react'
@@ -31,7 +30,7 @@ import { LeadsDashboard } from '@/components/studio/LeadsDashboard'
 import { useToast } from '@/hooks/use-toast'
 import { z } from 'zod'
 import { Sparkles, Loader2 } from 'lucide-react'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import pb from '@/lib/pocketbase/client'
 import { cn } from '@/lib/utils'
@@ -61,6 +60,7 @@ const formSchema = z.object({
     'brand_history',
     'sacoleira',
   ]),
+  columnist_bio: z.string().optional(),
   is_published: z.boolean().default(false),
   status: z.enum(['draft', 'review', 'published']).default('draft'),
 })
@@ -86,10 +86,21 @@ export default function Studio() {
   const [isCreating, setIsCreating] = useState(false)
   const [previewFormat, setPreviewFormat] = useState<string>('web')
   const [mobileTab, setMobileTab] = useState<'form' | 'preview'>('form')
+
+  // Media states
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+
+  const [extraImageFiles, setExtraImageFiles] = useState<(File | null)[]>([])
+  const [extraImagePreviews, setExtraImagePreviews] = useState<string[]>([])
+
+  const [columnistPhotoFile, setColumnistPhotoFile] = useState<File | null>(null)
+  const [columnistPhotoPreview, setColumnistPhotoPreview] = useState<string | null>(null)
+
   const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([])
   const [isMediaSelectorOpen, setIsMediaSelectorOpen] = useState(false)
+
+  // AI states
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiSuggestions, setAiSuggestions] = useState<{
@@ -105,7 +116,6 @@ export default function Studio() {
   const {
     register,
     handleSubmit,
-    control,
     reset,
     setValue,
     watch,
@@ -118,6 +128,7 @@ export default function Studio() {
       author: '',
       content: '',
       type: 'social',
+      columnist_bio: '',
       is_published: false,
       status: 'draft',
     },
@@ -125,6 +136,13 @@ export default function Studio() {
 
   const watchType = watch('type')
   const watchAll = watch()
+
+  const neededExtraImages =
+    watchType === 'style'
+      ? 2
+      : ['interview', 'brand_history', 'sacoleira'].includes(watchType)
+        ? 1
+        : 0
 
   const loadPosts = async () => {
     try {
@@ -145,8 +163,10 @@ export default function Studio() {
 
   useEffect(() => {
     if (isCreating) {
-      if (watchType === 'marketing') setValue('author', 'Valter Mendonça')
-      else if (watchType === 'social') setValue('author', 'Fábia Mendonça')
+      if (watchType === 'marketing') {
+        setValue('author', 'Valter Mendonça')
+        setValue('columnist_bio', '25 anos de experiência em Marketing e Branding')
+      } else if (watchType === 'social') setValue('author', 'Fábia Mendonça')
       else if (watchType === 'sacoleira') setValue('author', 'Redação')
     }
   }, [watchType, isCreating, setValue])
@@ -154,11 +174,19 @@ export default function Studio() {
   const filteredPosts =
     selectedSection === 'all' ? posts : posts.filter((p) => p.type === selectedSection)
 
+  const resetMediaStates = () => {
+    setImageFile(null)
+    setImagePreview(null)
+    setExtraImageFiles([])
+    setExtraImagePreviews([])
+    setColumnistPhotoFile(null)
+    setColumnistPhotoPreview(null)
+  }
+
   const handleNew = () => {
     setIsCreating(true)
     setEditingPost(null)
-    setImageFile(null)
-    setImagePreview(null)
+    resetMediaStates()
     const initialType = selectedSection !== 'all' ? (selectedSection as any) : 'social'
     reset({
       title: '',
@@ -171,6 +199,8 @@ export default function Studio() {
             : 'Redação',
       content: '<p></p>',
       type: initialType,
+      columnist_bio:
+        initialType === 'marketing' ? '25 anos de experiência em Marketing e Branding' : '',
       is_published: false,
       status: 'draft',
     })
@@ -179,14 +209,19 @@ export default function Studio() {
   const handleEdit = (post: MagazinePost) => {
     setIsCreating(false)
     setEditingPost(post)
-    setImageFile(null)
+    resetMediaStates()
     setImagePreview(post.main_image ? pb.files.getURL(post, post.main_image) : null)
+    setColumnistPhotoPreview(
+      post.columnist_photo ? pb.files.getURL(post, post.columnist_photo) : null,
+    )
+    setExtraImagePreviews(post.gallery ? post.gallery.map((f) => pb.files.getURL(post, f)) : [])
     reset({
       title: post.title,
       subtitle: post.subtitle || '',
       author: post.author,
       content: post.content,
       type: post.type,
+      columnist_bio: post.columnist_bio || '',
       is_published: post.is_published,
       status: post.status || 'draft',
     })
@@ -205,6 +240,20 @@ export default function Studio() {
     }
   }
 
+  const handleExtraImageChange = (index: number, file?: File) => {
+    if (!file) return
+    setExtraImageFiles((prev) => {
+      const next = [...prev]
+      next[index] = file
+      return next
+    })
+    setExtraImagePreviews((prev) => {
+      const next = [...prev]
+      next[index] = URL.createObjectURL(file)
+      return next
+    })
+  }
+
   const onSubmit = async (data: FormDataType) => {
     if (!user) {
       toast({
@@ -221,10 +270,18 @@ export default function Studio() {
     formData.append('author', data.author)
     formData.append('content', data.content)
     formData.append('type', data.type)
+    if (data.columnist_bio) formData.append('columnist_bio', data.columnist_bio)
     formData.append('is_published', String(data.is_published))
     formData.append('status', data.status)
-    if (imageFile) {
-      formData.append('main_image', imageFile)
+
+    if (imageFile) formData.append('main_image', imageFile)
+    if (columnistPhotoFile) formData.append('columnist_photo', columnistPhotoFile)
+
+    const hasNewGalleryFiles = extraImageFiles.some((f) => f instanceof File)
+    if (hasNewGalleryFiles) {
+      extraImageFiles.forEach((f) => {
+        if (f) formData.append('gallery', f)
+      })
     }
 
     try {
@@ -237,8 +294,7 @@ export default function Studio() {
       }
       setIsCreating(false)
       setEditingPost(null)
-      setImageFile(null)
-      setImagePreview(null)
+      resetMediaStates()
     } catch (err) {
       const fieldErrors = extractFieldErrors(err)
       toast({
@@ -250,6 +306,14 @@ export default function Studio() {
   }
 
   const showEditor = isCreating || editingPost
+
+  // Derived state for Preview
+  const currentGalleryUrls =
+    extraImagePreviews.length > 0
+      ? extraImagePreviews
+      : watchAll.gallery
+        ? watchAll.gallery.map((f: string) => pb.files.getURL(watchAll as any, f))
+        : []
 
   const handleAiAssist = async () => {
     const content = watch('content')
@@ -304,12 +368,12 @@ export default function Studio() {
             onValueChange={setSelectedSection}
             className="w-full max-w-4xl"
           >
-            <TabsList className="w-full flex h-10 bg-muted/50">
+            <TabsList className="w-full flex h-10 bg-muted/50 overflow-x-auto justify-start [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {SECTIONS.map((s) => (
                 <TabsTrigger
                   key={s.id}
                   value={s.id}
-                  className="flex-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                  className="flex-shrink-0 min-w-fit text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
                 >
                   {s.label}
                 </TabsTrigger>
@@ -323,7 +387,8 @@ export default function Studio() {
               size="sm"
               className="bg-brand-forest text-white hover:bg-brand-forest/90 shadow-sm"
             >
-              <Plus className="w-4 h-4 mr-2" /> Nova Edição
+              <Plus className="w-4 h-4 md:mr-2" />{' '}
+              <span className="hidden md:inline">Nova Edição</span>
             </Button>
           </div>
         </div>
@@ -408,7 +473,7 @@ export default function Studio() {
               <div className="flex-1 flex overflow-hidden bg-muted/10 relative">
                 <div
                   className={cn(
-                    'w-full xl:w-1/2 border-r bg-card flex flex-col shadow-lg z-10',
+                    'w-full xl:w-[500px] 2xl:w-[600px] border-r bg-card flex flex-col shadow-lg z-10 shrink-0',
                     mobileTab !== 'form' && 'hidden xl:flex',
                   )}
                 >
@@ -422,6 +487,7 @@ export default function Studio() {
                       onClick={() => {
                         setIsCreating(false)
                         setEditingPost(null)
+                        resetMediaStates()
                       }}
                     >
                       <X className="w-5 h-5" />
@@ -431,7 +497,7 @@ export default function Studio() {
                     <form
                       id="post-form"
                       onSubmit={handleSubmit(onSubmit)}
-                      className="space-y-6 max-w-lg mx-auto"
+                      className="space-y-6 max-w-lg mx-auto pb-10"
                     >
                       {!user && (
                         <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mb-4 border border-red-100">
@@ -501,6 +567,46 @@ export default function Studio() {
                         )}
                       </div>
 
+                      {watchType === 'marketing' && (
+                        <div className="space-y-4 border-t pt-4 mt-4 bg-brand-forest/5 border border-brand-forest/20 p-4 rounded-lg">
+                          <Label className="uppercase tracking-wider text-xs font-bold text-brand-forest">
+                            Atribuição Especial - Marketing de Moda
+                          </Label>
+                          <div className="space-y-3">
+                            <div className="space-y-2">
+                              <Label className="text-xs">Bio do Colunista</Label>
+                              <Input
+                                {...register('columnist_bio')}
+                                placeholder="Ex: 25 anos de experiência..."
+                                className="bg-white text-xs"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Foto do Colunista (Avatar)</Label>
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0]
+                                  if (file) {
+                                    setColumnistPhotoFile(file)
+                                    setColumnistPhotoPreview(URL.createObjectURL(file))
+                                  }
+                                }}
+                                className="bg-white text-xs"
+                              />
+                              {columnistPhotoPreview && (
+                                <img
+                                  src={columnistPhotoPreview}
+                                  className="w-16 h-16 rounded-full object-cover mt-2 border-2 border-white shadow-sm"
+                                  alt="Colunista"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-2">
                         <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
                           Imagem Principal
@@ -516,63 +622,11 @@ export default function Studio() {
                                 setImagePreview(URL.createObjectURL(file))
                               }
                             }}
-                            className="cursor-pointer file:text-brand-forest file:font-semibold flex-1"
+                            className="cursor-pointer file:text-brand-forest file:font-semibold flex-1 text-xs"
                           />
-                          <Dialog open={isMediaSelectorOpen} onOpenChange={setIsMediaSelectorOpen}>
-                            <DialogTrigger asChild>
-                              <Button type="button" variant="outline" className="px-3 shrink-0">
-                                <ImageIcon className="w-4 h-4 mr-2" /> Galeria
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-3xl">
-                              <DialogHeader>
-                                <DialogTitle>Biblioteca de Mídia</DialogTitle>
-                              </DialogHeader>
-                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto p-2">
-                                {mediaAssets.map((asset) => (
-                                  <div
-                                    key={asset.id}
-                                    className="cursor-pointer border rounded overflow-hidden aspect-square hover:ring-2 hover:ring-brand-forest transition-all"
-                                    onClick={async () => {
-                                      try {
-                                        const url = pb.files.getURL(asset, asset.file)
-                                        const response = await fetch(url)
-                                        const blob = await response.blob()
-                                        const file = new File([blob], asset.file || 'image.jpg', {
-                                          type: blob.type,
-                                        })
-                                        setImageFile(file)
-                                        setImagePreview(url)
-                                        setIsMediaSelectorOpen(false)
-                                      } catch (error) {
-                                        console.error('Failed to load image from library', error)
-                                      }
-                                    }}
-                                  >
-                                    {asset.file ? (
-                                      <img
-                                        src={pb.files.getURL(asset, asset.file)}
-                                        alt={asset.alt_text}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                                        Sem Imagem
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                                {mediaAssets.length === 0 && (
-                                  <p className="col-span-full text-center text-muted-foreground text-sm">
-                                    Nenhuma mídia encontrada.
-                                  </p>
-                                )}
-                              </div>
-                            </DialogContent>
-                          </Dialog>
                         </div>
                         {imagePreview && (
-                          <div className="mt-2 w-32 h-32 rounded-md overflow-hidden border bg-muted/20 relative">
+                          <div className="mt-2 w-full aspect-video rounded-md overflow-hidden border bg-muted/20 relative">
                             <img
                               src={imagePreview}
                               alt="Preview"
@@ -582,7 +636,7 @@ export default function Studio() {
                               type="button"
                               variant="destructive"
                               size="icon"
-                              className="absolute top-1 right-1 h-6 w-6"
+                              className="absolute top-2 right-2 h-6 w-6"
                               onClick={() => {
                                 setImageFile(null)
                                 setImagePreview(null)
@@ -594,10 +648,45 @@ export default function Studio() {
                         )}
                       </div>
 
+                      {neededExtraImages > 0 && (
+                        <div className="space-y-4 border-t pt-4 mt-4 bg-muted/10 p-4 rounded-lg border border-dashed">
+                          <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground flex items-center gap-2">
+                            <ImageIcon className="w-4 h-4" /> Galeria Adicional ({neededExtraImages}{' '}
+                            necessárias)
+                          </Label>
+                          <p className="text-[10px] text-muted-foreground mb-2">
+                            O layout "{SECTIONS.find((s) => s.id === watchType)?.label}" requer
+                            fotos de apoio.
+                          </p>
+                          <div className="grid grid-cols-1 gap-4">
+                            {Array.from({ length: neededExtraImages }).map((_, i) => (
+                              <div key={i} className="space-y-2 bg-white p-3 rounded border">
+                                <Label className="text-xs font-bold">Foto Extra {i + 1}</Label>
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleExtraImageChange(i, e.target.files?.[0])}
+                                  className="text-xs"
+                                />
+                                {extraImagePreviews[i] && (
+                                  <div className="relative w-full h-32 rounded overflow-hidden border mt-2">
+                                    <img
+                                      src={extraImagePreviews[i]}
+                                      className="w-full h-full object-cover"
+                                      alt={`Extra ${i + 1}`}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                            Corpo do Texto (Suporta HTML)
+                            Corpo do Texto (HTML)
                           </Label>
                           <Button
                             type="button"
@@ -606,8 +695,7 @@ export default function Studio() {
                             className="h-7 text-xs bg-brand-forest/10 text-brand-forest border-brand-forest/20 hover:bg-brand-forest hover:text-white"
                             onClick={handleAiAssist}
                           >
-                            <Sparkles className="w-3 h-3 mr-2" />
-                            Assistente IA
+                            <Sparkles className="w-3 h-3 mr-2" /> Assistente IA
                           </Button>
                         </div>
                         <Textarea
@@ -647,6 +735,7 @@ export default function Studio() {
                       onClick={() => {
                         setIsCreating(false)
                         setEditingPost(null)
+                        resetMediaStates()
                       }}
                     >
                       Cancelar
@@ -664,7 +753,7 @@ export default function Studio() {
 
                 <div
                   className={cn(
-                    'w-full xl:w-1/2 bg-[#EAEAEA] flex-col',
+                    'flex-1 bg-[#EAEAEA] flex flex-col',
                     mobileTab !== 'preview' && 'hidden xl:flex',
                   )}
                 >
@@ -700,6 +789,8 @@ export default function Studio() {
                         <PostPreviewLayout
                           post={watchAll as any}
                           imageUrl={imagePreview}
+                          galleryUrls={currentGalleryUrls}
+                          columnistPhotoUrl={columnistPhotoPreview}
                           format={previewFormat}
                         />
                       </div>
@@ -755,51 +846,6 @@ export default function Studio() {
                             <Label className="font-bold text-sm">Hashtags para Redes Sociais</Label>
                             <div className="p-3 border rounded-md text-sm bg-muted/20 text-brand-forest font-medium">
                               {aiSuggestions.hashtags}
-                            </div>
-                          </div>
-                          <div className="space-y-3 pt-4 border-t">
-                            <Label className="font-bold text-sm flex items-center gap-2">
-                              <ImageIcon className="w-4 h-4" /> Sugestões de Imagens (AI Curation)
-                            </Label>
-                            <div className="grid grid-cols-3 gap-2">
-                              {[1, 2, 3].map((seed) => (
-                                <div
-                                  key={seed}
-                                  className="relative group rounded-md overflow-hidden aspect-video border cursor-pointer hover:ring-2 ring-brand-forest transition-all"
-                                  onClick={async () => {
-                                    const keyword =
-                                      aiSuggestions.hashtags.split(' ')[0]?.replace('#', '') ||
-                                      'fashion'
-                                    const url = `https://img.usecurling.com/p/800/600?q=${encodeURIComponent(keyword)}&seed=${seed}`
-                                    try {
-                                      const res = await fetch(url)
-                                      const blob = await res.blob()
-                                      setImageFile(
-                                        new File([blob], `ai-suggestion-${seed}.jpg`, {
-                                          type: blob.type,
-                                        }),
-                                      )
-                                      setImagePreview(url)
-                                      setIsAIAssistantOpen(false)
-                                      toast({
-                                        title: 'Imagem Selecionada',
-                                        description: 'Imagem da IA aplicada com sucesso.',
-                                      })
-                                    } catch {
-                                      /* intentionally ignored */
-                                    }
-                                  }}
-                                >
-                                  <img
-                                    src={`https://img.usecurling.com/p/800/600?q=${encodeURIComponent(aiSuggestions.hashtags.split(' ')[0]?.replace('#', '') || 'fashion')}&seed=${seed}`}
-                                    className="w-full h-full object-cover"
-                                    alt="AI Suggestion"
-                                  />
-                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                                    <span className="text-white text-xs font-bold">Usar</span>
-                                  </div>
-                                </div>
-                              ))}
                             </div>
                           </div>
                         </div>
