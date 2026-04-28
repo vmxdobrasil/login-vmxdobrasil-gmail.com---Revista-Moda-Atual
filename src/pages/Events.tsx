@@ -7,6 +7,31 @@ import { Button } from '@/components/ui/button'
 
 const CATEGORIES = ['All', 'Desfile', 'Festa', 'Tapete Vermelho', 'Outros']
 
+const formatPTDate = (dateStr: string) => {
+  if (!dateStr) return ''
+  const isoStr = dateStr.length === 10 ? `${dateStr}T12:00:00Z` : dateStr
+  const d = new Date(isoStr)
+  if (isNaN(d.getTime())) return ''
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  const months = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+  ]
+  const month = months[d.getUTCMonth()]
+  const year = d.getUTCFullYear()
+  return `${day} de ${month} de ${year}`
+}
+
 export default function EventsPage() {
   const [events, setEvents] = useState<FashionEvent[]>([])
   const [activeCategory, setActiveCategory] = useState('All')
@@ -101,7 +126,8 @@ export default function EventsPage() {
                 <div className="lg:col-span-5 space-y-6">
                   <div className="flex items-center text-xs text-muted-foreground/70 uppercase tracking-widest font-bold">
                     <Calendar className="w-4 h-4 mr-2 text-brand-forest" />
-                    {new Date(spotlight.date).toLocaleDateString('pt-BR')}
+                    Publicado na coluna social Holofote da Revista Moda Atual no dia{' '}
+                    {formatPTDate(spotlight.date)}
                   </div>
                   <h2 className="font-serif text-4xl md:text-5xl font-bold leading-tight text-foreground">
                     {spotlight.title}
@@ -187,7 +213,7 @@ export default function EventsPage() {
                       </div>
                       <div className="space-y-2">
                         <div className="text-xs text-muted-foreground uppercase tracking-widest font-bold">
-                          {new Date(ev.date).toLocaleDateString('pt-BR')}
+                          {formatPTDate(ev.date)}
                         </div>
                         <h4 className="font-serif text-xl font-bold leading-tight group-hover:text-brand-forest transition-colors">
                           {ev.title}

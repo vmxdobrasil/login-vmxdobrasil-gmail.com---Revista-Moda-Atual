@@ -22,11 +22,48 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Plus, Save, Trash2, Edit, X, ImageIcon, UploadCloud, Calendar } from 'lucide-react'
+import {
+  Plus,
+  Save,
+  Trash2,
+  Edit,
+  X,
+  ImageIcon,
+  UploadCloud,
+  Calendar as CalendarIcon,
+} from 'lucide-react'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 const CATEGORIES = ['Desfile', 'Festa', 'Tapete Vermelho', 'Outros']
+
+const formatPTDate = (dateStr: string) => {
+  if (!dateStr) return ''
+  const isoStr = dateStr.length === 10 ? `${dateStr}T12:00:00Z` : dateStr
+  const d = new Date(isoStr)
+  if (isNaN(d.getTime())) return ''
+  const day = String(d.getUTCDate()).padStart(2, '0')
+  const months = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+  ]
+  const month = months[d.getUTCMonth()]
+  const year = d.getUTCFullYear()
+  return `${day} de ${month} de ${year}`
+}
 
 type GalleryItem = {
   title: string
@@ -217,13 +254,44 @@ export function SpotlightManager() {
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                  <div className="space-y-2">
+                  <div className="space-y-2 flex flex-col mt-[2px]">
                     <Label>Data do Evento</Label>
-                    <Input
-                      type="date"
-                      value={editing.date ? editing.date.split('T')[0] : ''}
-                      onChange={(e) => setEditing({ ...editing, date: e.target.value })}
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            'w-full justify-start text-left font-normal',
+                            !editing.date && 'text-muted-foreground',
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editing.date ? (
+                            formatPTDate(editing.date)
+                          ) : (
+                            <span>Selecione uma data</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <CalendarComponent
+                          mode="single"
+                          selected={
+                            editing.date
+                              ? new Date(
+                                  editing.date.length === 10
+                                    ? editing.date + 'T12:00:00Z'
+                                    : editing.date,
+                                )
+                              : undefined
+                          }
+                          onSelect={(d: Date | undefined) =>
+                            setEditing({ ...editing, date: d ? d.toISOString() : '' })
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="flex items-center gap-3 pt-4">
                     <Switch
@@ -393,8 +461,7 @@ export function SpotlightManager() {
                   {ev.title}
                 </h3>
                 <div className="flex items-center text-xs text-muted-foreground mt-2 uppercase tracking-wider">
-                  <Calendar className="w-3 h-3 mr-1" />{' '}
-                  {new Date(ev.date).toLocaleDateString('pt-BR')}
+                  <CalendarIcon className="w-3 h-3 mr-1" /> {formatPTDate(ev.date)}
                 </div>
                 <div className="flex items-center gap-2 mt-4 pt-4 border-t">
                   <Button
