@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-27T13:41:52.183Z",
+  "generatedAt": "2026-04-28T18:14:31.367Z",
   "collections": [
     {
       "name": "users",
@@ -248,6 +248,18 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "is_spotlight",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "display_order",
+          "type": "number",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []

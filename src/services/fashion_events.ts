@@ -7,6 +7,8 @@ export interface FashionEvent {
   date: string
   location: string
   image: string
+  is_spotlight: boolean
+  display_order: number
   created: string
   updated: string
 }

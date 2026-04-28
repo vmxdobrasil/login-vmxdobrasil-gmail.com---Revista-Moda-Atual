@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog'
 import { getMediaAssets, MediaAsset } from '@/services/media_assets'
 import { PostPreviewLayout } from '@/components/studio/layouts'
+import { SpotlightManager } from '@/components/studio/SpotlightManager'
 import { useToast } from '@/hooks/use-toast'
 import { z } from 'zod'
 import { Sparkles, Loader2 } from 'lucide-react'
@@ -36,7 +37,7 @@ import { cn } from '@/lib/utils'
 
 const SECTIONS = [
   { id: 'all', label: 'Todas' },
-  { id: 'social', label: 'Holofote' },
+  { id: 'social', label: 'Social' },
   { id: 'trends', label: 'Tendências' },
   { id: 'interview', label: 'Entrevista' },
   { id: 'marketing', label: 'Marketing' },
@@ -77,6 +78,7 @@ const PREVIEW_FORMATS = [
 export default function Studio() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const [activeModule, setActiveModule] = useState<'posts' | 'spotlight'>('posts')
   const [posts, setPosts] = useState<MagazinePost[]>([])
   const [selectedSection, setSelectedSection] = useState<string>('all')
   const [editingPost, setEditingPost] = useState<MagazinePost | null>(null)
@@ -273,478 +275,515 @@ export default function Studio() {
 
   return (
     <div className="flex h-full w-full overflow-hidden flex-col bg-background">
-      <div className="border-b px-4 py-2 flex items-center justify-between shrink-0 bg-card">
+      <div className="border-b px-4 py-2 flex flex-col sm:flex-row sm:items-center gap-4 shrink-0 bg-card">
+        <div className="font-serif font-bold text-xl text-brand-forest">Studio</div>
         <Tabs
-          value={selectedSection}
-          onValueChange={setSelectedSection}
-          className="w-full max-w-4xl"
+          value={activeModule}
+          onValueChange={(v) => setActiveModule(v as any)}
+          className="w-full max-w-[400px]"
         >
-          <TabsList className="w-full flex h-10 bg-muted/50">
-            {SECTIONS.map((s) => (
-              <TabsTrigger
-                key={s.id}
-                value={s.id}
-                className="flex-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
-              >
-                {s.label}
-              </TabsTrigger>
-            ))}
+          <TabsList className="w-full h-9">
+            <TabsTrigger value="posts" className="flex-1">
+              Redação
+            </TabsTrigger>
+            <TabsTrigger value="spotlight" className="flex-1">
+              Holofote (Destaques)
+            </TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="ml-4 shrink-0">
-          <Button
-            onClick={handleNew}
-            disabled={!user}
-            size="sm"
-            className="bg-brand-forest text-white hover:bg-brand-forest/90 shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-2" /> Nova Edição
-          </Button>
-        </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar List */}
-        <div
-          className={`w-80 border-r bg-muted/20 flex flex-col ${showEditor ? 'hidden lg:flex' : 'flex w-full md:w-80'}`}
-        >
-          <div className="p-4 border-b bg-muted/30">
-            <h3 className="font-serif font-semibold text-sm tracking-widest uppercase">
-              Acervo de Posts ({filteredPosts.length})
-            </h3>
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="p-3 space-y-3">
-              {filteredPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className={`p-4 rounded-lg border transition-all cursor-pointer ${editingPost?.id === post.id ? 'bg-primary/5 border-primary shadow-sm' : 'bg-card hover:bg-muted/50 hover:shadow-sm'}`}
-                  onClick={() => handleEdit(post)}
+      {activeModule === 'posts' && (
+        <div className="border-b px-4 py-2 flex items-center justify-between shrink-0 bg-muted/10">
+          <Tabs
+            value={selectedSection}
+            onValueChange={setSelectedSection}
+            className="w-full max-w-4xl"
+          >
+            <TabsList className="w-full flex h-10 bg-muted/50">
+              {SECTIONS.map((s) => (
+                <TabsTrigger
+                  key={s.id}
+                  value={s.id}
+                  className="flex-1 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-serif font-bold text-base leading-tight line-clamp-2">
-                      {post.title}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground flex justify-between items-center mb-3">
-                    <span className="font-medium">{post.author}</span>
-                    <span className="uppercase tracking-wider text-[10px] border px-2 py-0.5 rounded bg-muted/50">
-                      {post.type}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between border-t pt-3">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${post.status === 'published' ? 'bg-green-100 text-green-700 border border-green-200' : post.status === 'review' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}
-                    >
-                      {post.status === 'published'
-                        ? 'Publicado'
-                        : post.status === 'review'
-                          ? 'Em Revisão'
-                          : 'Rascunho'}
-                    </span>
-                    {user && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDelete(post.id)
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
+                  {s.label}
+                </TabsTrigger>
               ))}
-              {filteredPosts.length === 0 && (
-                <div className="text-center p-8 text-muted-foreground text-sm font-serif italic">
-                  Nenhum artigo encontrado nesta seção.
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+            </TabsList>
+          </Tabs>
+          <div className="ml-4 shrink-0">
+            <Button
+              onClick={handleNew}
+              disabled={!user}
+              size="sm"
+              className="bg-brand-forest text-white hover:bg-brand-forest/90 shadow-sm"
+            >
+              <Plus className="w-4 h-4 mr-2" /> Nova Edição
+            </Button>
+          </div>
         </div>
+      )}
 
-        {/* Editor Area */}
-        {showEditor ? (
-          <div className="flex-1 flex overflow-hidden bg-muted/10 relative">
-            <div
-              className={cn(
-                'w-full xl:w-1/2 border-r bg-card flex flex-col shadow-lg z-10',
-                mobileTab !== 'form' && 'hidden xl:flex',
-              )}
-            >
-              <div className="p-4 border-b flex justify-between items-center shrink-0 bg-muted/30">
-                <h2 className="font-serif font-bold text-lg">
-                  {isCreating ? 'Escrever Nova Matéria' : 'Revisar Matéria'}
-                </h2>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    setIsCreating(false)
-                    setEditingPost(null)
-                  }}
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-              <ScrollArea className="flex-1 p-6">
-                <form
-                  id="post-form"
-                  onSubmit={handleSubmit(onSubmit)}
-                  className="space-y-6 max-w-lg mx-auto"
-                >
-                  {!user && (
-                    <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mb-4 border border-red-100">
-                      Aviso: Você precisa fazer login para salvar suas edições.
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                      Coluna / Seção
-                    </Label>
-                    <select
-                      {...register('type')}
-                      className="w-full border rounded-md p-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-brand-forest"
-                    >
-                      {SECTIONS.filter((s) => s.id !== 'all').map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                      Título da Matéria
-                    </Label>
-                    <Input
-                      {...register('title')}
-                      placeholder="Escreva a manchete principal..."
-                      className={`font-serif text-lg ${errors.title ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-brand-forest'}`}
-                    />
-                    {errors.title && (
-                      <span className="text-xs text-red-500 font-medium">
-                        {errors.title.message}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                      Subtítulo (Opcional)
-                    </Label>
-                    <Input
-                      {...register('subtitle')}
-                      placeholder="Linha de apoio da matéria..."
-                      className="focus-visible:ring-brand-forest"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                      Autor / Assinatura
-                    </Label>
-                    <Input
-                      {...register('author')}
-                      placeholder="Quem assina a coluna?"
-                      className={
-                        errors.author
-                          ? 'border-red-500 focus-visible:ring-red-500'
-                          : 'focus-visible:ring-brand-forest'
-                      }
-                    />
-                    {errors.author && (
-                      <span className="text-xs text-red-500 font-medium">
-                        {errors.author.message}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                      Imagem Principal
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            setImageFile(file)
-                            setImagePreview(URL.createObjectURL(file))
-                          }
-                        }}
-                        className="cursor-pointer file:text-brand-forest file:font-semibold flex-1"
-                      />
-                      <Dialog open={isMediaSelectorOpen} onOpenChange={setIsMediaSelectorOpen}>
-                        <DialogTrigger asChild>
-                          <Button type="button" variant="outline" className="px-3 shrink-0">
-                            <ImageIcon className="w-4 h-4 mr-2" /> Galeria
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-3xl">
-                          <DialogHeader>
-                            <DialogTitle>Biblioteca de Mídia</DialogTitle>
-                          </DialogHeader>
-                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto p-2">
-                            {mediaAssets.map((asset) => (
-                              <div
-                                key={asset.id}
-                                className="cursor-pointer border rounded overflow-hidden aspect-square hover:ring-2 hover:ring-brand-forest transition-all"
-                                onClick={async () => {
-                                  try {
-                                    const url = pb.files.getURL(asset, asset.file)
-                                    const response = await fetch(url)
-                                    const blob = await response.blob()
-                                    const file = new File([blob], asset.file || 'image.jpg', {
-                                      type: blob.type,
-                                    })
-                                    setImageFile(file)
-                                    setImagePreview(url)
-                                    setIsMediaSelectorOpen(false)
-                                  } catch (error) {
-                                    console.error('Failed to load image from library', error)
-                                  }
-                                }}
-                              >
-                                {asset.file ? (
-                                  <img
-                                    src={pb.files.getURL(asset, asset.file)}
-                                    alt={asset.alt_text}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">
-                                    Sem Imagem
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                            {mediaAssets.length === 0 && (
-                              <p className="col-span-full text-center text-muted-foreground text-sm">
-                                Nenhuma mídia encontrada.
-                              </p>
-                            )}
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                    {imagePreview && (
-                      <div className="mt-2 w-32 h-32 rounded-md overflow-hidden border bg-muted/20 relative">
-                        <img
-                          src={imagePreview}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-1 right-1 h-6 w-6"
-                          onClick={() => {
-                            setImageFile(null)
-                            setImagePreview(null)
-                          }}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                        Corpo do Texto (Suporta HTML)
-                      </Label>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs bg-brand-forest/10 text-brand-forest border-brand-forest/20 hover:bg-brand-forest hover:text-white"
-                        onClick={handleAiAssist}
-                      >
-                        <Sparkles className="w-3 h-3 mr-2" />
-                        Assistente IA
-                      </Button>
-                    </div>
-                    <Textarea
-                      {...register('content')}
-                      placeholder="<p>Escreva o texto principal aqui...</p>"
-                      className={`min-h-[250px] font-mono text-sm leading-relaxed resize-none ${errors.content ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-brand-forest'}`}
-                    />
-                    {errors.content && (
-                      <span className="text-xs text-red-500 font-medium">
-                        {errors.content.message}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-3 border p-5 rounded-lg bg-muted/20">
-                    <div>
-                      <Label className="text-base font-bold">Status Editorial</Label>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Apenas matérias marcadas como "Publicado" aparecem no site e link na bio.
-                      </p>
-                    </div>
-                    <select
-                      {...register('status')}
-                      className="w-full border rounded-md p-3 text-sm bg-background outline-none focus:ring-2 focus:ring-brand-forest"
-                    >
-                      <option value="draft">Rascunho</option>
-                      <option value="review">Em Revisão</option>
-                      <option value="published">Publicado</option>
-                    </select>
-                  </div>
-                </form>
-              </ScrollArea>
-              <div className="p-4 border-t shrink-0 flex justify-end gap-3 bg-card pb-20 xl:pb-4">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsCreating(false)
-                    setEditingPost(null)
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  form="post-form"
-                  disabled={!user}
-                  className="bg-brand-forest text-white hover:bg-brand-forest/90 font-bold px-8"
-                >
-                  <Check className="w-4 h-4 mr-2" /> Salvar Edição
-                </Button>
-              </div>
-            </div>
-
-            <div
-              className={cn(
-                'w-full xl:w-1/2 bg-[#EAEAEA] flex-col',
-                mobileTab !== 'preview' && 'hidden xl:flex',
-              )}
-            >
-              <div className="p-3 border-b bg-card shrink-0 flex flex-col gap-3 shadow-sm z-10">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
-                    Visualização: {PREVIEW_FORMATS.find((f) => f.id === previewFormat)?.label}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                  {PREVIEW_FORMATS.map((f) => (
-                    <Button
-                      key={f.id}
-                      type="button"
-                      variant={previewFormat === f.id ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPreviewFormat(f.id)}
-                      className="text-xs whitespace-nowrap h-7 rounded-full"
-                    >
-                      {f.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex-1 overflow-hidden relative flex items-center justify-center p-4">
-                <div
-                  className={cn(
-                    'bg-white shadow-elevation overflow-y-auto transition-all duration-500 ease-in-out [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
-                    PREVIEW_FORMATS.find((f) => f.id === previewFormat)?.className,
-                  )}
-                >
-                  <div className="animate-fade-in min-h-full">
-                    <PostPreviewLayout
-                      post={watchAll as any}
-                      imageUrl={imagePreview}
-                      format={previewFormat}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Dialog open={isAIAssistantOpen} onOpenChange={setIsAIAssistantOpen}>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-brand-forest" />
-                    Editor Estratégico IA
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="py-4">
-                  {aiLoading ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-4">
-                      <Loader2 className="w-8 h-8 animate-spin text-brand-forest" />
-                      <p className="text-sm">
-                        Analisando o conteúdo e gerando recomendações SEO...
-                      </p>
-                    </div>
-                  ) : aiSuggestions ? (
-                    <div className="space-y-6">
-                      <div className="space-y-3">
-                        <Label className="font-bold text-sm">Títulos Sugeridos (SEO)</Label>
-                        <div className="grid gap-2">
-                          {aiSuggestions.titles.map((t, i) => (
-                            <div key={i} className="flex gap-2 items-center">
-                              <div className="flex-1 p-3 border rounded-md text-sm bg-muted/20 font-serif">
-                                {t}
-                              </div>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setValue('title', t)}
-                              >
-                                Usar
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="font-bold text-sm">Meta-Description Sugerida</Label>
-                        <div className="p-3 border rounded-md text-sm bg-muted/20 text-muted-foreground">
-                          {aiSuggestions.meta_description}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="font-bold text-sm">Hashtags para Redes Sociais</Label>
-                        <div className="p-3 border rounded-md text-sm bg-muted/20 text-brand-forest font-medium">
-                          {aiSuggestions.hashtags}
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Mobile Tab Switcher */}
-            <div className="xl:hidden absolute bottom-6 right-6 z-50">
-              <Button
-                size="icon"
-                className="h-14 w-14 rounded-full shadow-elevation bg-brand-forest hover:bg-brand-forest/90 text-white"
-                onClick={() => setMobileTab(mobileTab === 'form' ? 'preview' : 'form')}
-              >
-                {mobileTab === 'form' ? <Eye className="w-6 h-6" /> : <Edit2 className="w-6 h-6" />}
-              </Button>
-            </div>
+      <div className="flex flex-1 overflow-hidden">
+        {activeModule === 'spotlight' ? (
+          <div className="flex-1 overflow-y-auto">
+            <SpotlightManager />
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 animate-fade-in">
-            <div className="w-20 h-20 rounded-full bg-card shadow-sm flex items-center justify-center mb-6">
-              <Edit className="w-10 h-10 text-muted-foreground/50" />
+          <>
+            {/* Sidebar List */}
+            <div
+              className={`w-80 border-r bg-muted/20 flex flex-col ${showEditor ? 'hidden lg:flex' : 'flex w-full md:w-80'}`}
+            >
+              <div className="p-4 border-b bg-muted/30">
+                <h3 className="font-serif font-semibold text-sm tracking-widest uppercase">
+                  Acervo de Posts ({filteredPosts.length})
+                </h3>
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="p-3 space-y-3">
+                  {filteredPosts.map((post) => (
+                    <div
+                      key={post.id}
+                      className={`p-4 rounded-lg border transition-all cursor-pointer ${editingPost?.id === post.id ? 'bg-primary/5 border-primary shadow-sm' : 'bg-card hover:bg-muted/50 hover:shadow-sm'}`}
+                      onClick={() => handleEdit(post)}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-serif font-bold text-base leading-tight line-clamp-2">
+                          {post.title}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground flex justify-between items-center mb-3">
+                        <span className="font-medium">{post.author}</span>
+                        <span className="uppercase tracking-wider text-[10px] border px-2 py-0.5 rounded bg-muted/50">
+                          {post.type}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between border-t pt-3">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${post.status === 'published' ? 'bg-green-100 text-green-700 border border-green-200' : post.status === 'review' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}
+                        >
+                          {post.status === 'published'
+                            ? 'Publicado'
+                            : post.status === 'review'
+                              ? 'Em Revisão'
+                              : 'Rascunho'}
+                        </span>
+                        {user && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDelete(post.id)
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {filteredPosts.length === 0 && (
+                    <div className="text-center p-8 text-muted-foreground text-sm font-serif italic">
+                      Nenhum artigo encontrado nesta seção.
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
             </div>
-            <h2 className="font-serif text-2xl font-bold text-foreground mb-2">Sala de Redação</h2>
-            <p className="text-sm">Selecione uma matéria no acervo ou inicie uma nova edição.</p>
-          </div>
+
+            {/* Editor Area */}
+            {showEditor ? (
+              <div className="flex-1 flex overflow-hidden bg-muted/10 relative">
+                <div
+                  className={cn(
+                    'w-full xl:w-1/2 border-r bg-card flex flex-col shadow-lg z-10',
+                    mobileTab !== 'form' && 'hidden xl:flex',
+                  )}
+                >
+                  <div className="p-4 border-b flex justify-between items-center shrink-0 bg-muted/30">
+                    <h2 className="font-serif font-bold text-lg">
+                      {isCreating ? 'Escrever Nova Matéria' : 'Revisar Matéria'}
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setIsCreating(false)
+                        setEditingPost(null)
+                      }}
+                    >
+                      <X className="w-5 h-5" />
+                    </Button>
+                  </div>
+                  <ScrollArea className="flex-1 p-6">
+                    <form
+                      id="post-form"
+                      onSubmit={handleSubmit(onSubmit)}
+                      className="space-y-6 max-w-lg mx-auto"
+                    >
+                      {!user && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-md text-sm mb-4 border border-red-100">
+                          Aviso: Você precisa fazer login para salvar suas edições.
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                          Coluna / Seção
+                        </Label>
+                        <select
+                          {...register('type')}
+                          className="w-full border rounded-md p-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-brand-forest"
+                        >
+                          {SECTIONS.filter((s) => s.id !== 'all').map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                          Título da Matéria
+                        </Label>
+                        <Input
+                          {...register('title')}
+                          placeholder="Escreva a manchete principal..."
+                          className={`font-serif text-lg ${errors.title ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-brand-forest'}`}
+                        />
+                        {errors.title && (
+                          <span className="text-xs text-red-500 font-medium">
+                            {errors.title.message}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                          Subtítulo (Opcional)
+                        </Label>
+                        <Input
+                          {...register('subtitle')}
+                          placeholder="Linha de apoio da matéria..."
+                          className="focus-visible:ring-brand-forest"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                          Autor / Assinatura
+                        </Label>
+                        <Input
+                          {...register('author')}
+                          placeholder="Quem assina a coluna?"
+                          className={
+                            errors.author
+                              ? 'border-red-500 focus-visible:ring-red-500'
+                              : 'focus-visible:ring-brand-forest'
+                          }
+                        />
+                        {errors.author && (
+                          <span className="text-xs text-red-500 font-medium">
+                            {errors.author.message}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                          Imagem Principal
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                setImageFile(file)
+                                setImagePreview(URL.createObjectURL(file))
+                              }
+                            }}
+                            className="cursor-pointer file:text-brand-forest file:font-semibold flex-1"
+                          />
+                          <Dialog open={isMediaSelectorOpen} onOpenChange={setIsMediaSelectorOpen}>
+                            <DialogTrigger asChild>
+                              <Button type="button" variant="outline" className="px-3 shrink-0">
+                                <ImageIcon className="w-4 h-4 mr-2" /> Galeria
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl">
+                              <DialogHeader>
+                                <DialogTitle>Biblioteca de Mídia</DialogTitle>
+                              </DialogHeader>
+                              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto p-2">
+                                {mediaAssets.map((asset) => (
+                                  <div
+                                    key={asset.id}
+                                    className="cursor-pointer border rounded overflow-hidden aspect-square hover:ring-2 hover:ring-brand-forest transition-all"
+                                    onClick={async () => {
+                                      try {
+                                        const url = pb.files.getURL(asset, asset.file)
+                                        const response = await fetch(url)
+                                        const blob = await response.blob()
+                                        const file = new File([blob], asset.file || 'image.jpg', {
+                                          type: blob.type,
+                                        })
+                                        setImageFile(file)
+                                        setImagePreview(url)
+                                        setIsMediaSelectorOpen(false)
+                                      } catch (error) {
+                                        console.error('Failed to load image from library', error)
+                                      }
+                                    }}
+                                  >
+                                    {asset.file ? (
+                                      <img
+                                        src={pb.files.getURL(asset, asset.file)}
+                                        alt={asset.alt_text}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                                        Sem Imagem
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                {mediaAssets.length === 0 && (
+                                  <p className="col-span-full text-center text-muted-foreground text-sm">
+                                    Nenhuma mídia encontrada.
+                                  </p>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                        {imagePreview && (
+                          <div className="mt-2 w-32 h-32 rounded-md overflow-hidden border bg-muted/20 relative">
+                            <img
+                              src={imagePreview}
+                              alt="Preview"
+                              className="w-full h-full object-cover"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-1 right-1 h-6 w-6"
+                              onClick={() => {
+                                setImageFile(null)
+                                setImagePreview(null)
+                              }}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                            Corpo do Texto (Suporta HTML)
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs bg-brand-forest/10 text-brand-forest border-brand-forest/20 hover:bg-brand-forest hover:text-white"
+                            onClick={handleAiAssist}
+                          >
+                            <Sparkles className="w-3 h-3 mr-2" />
+                            Assistente IA
+                          </Button>
+                        </div>
+                        <Textarea
+                          {...register('content')}
+                          placeholder="<p>Escreva o texto principal aqui...</p>"
+                          className={`min-h-[250px] font-mono text-sm leading-relaxed resize-none ${errors.content ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-brand-forest'}`}
+                        />
+                        {errors.content && (
+                          <span className="text-xs text-red-500 font-medium">
+                            {errors.content.message}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-3 border p-5 rounded-lg bg-muted/20">
+                        <div>
+                          <Label className="text-base font-bold">Status Editorial</Label>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Apenas matérias marcadas como "Publicado" aparecem no site e link na
+                            bio.
+                          </p>
+                        </div>
+                        <select
+                          {...register('status')}
+                          className="w-full border rounded-md p-3 text-sm bg-background outline-none focus:ring-2 focus:ring-brand-forest"
+                        >
+                          <option value="draft">Rascunho</option>
+                          <option value="review">Em Revisão</option>
+                          <option value="published">Publicado</option>
+                        </select>
+                      </div>
+                    </form>
+                  </ScrollArea>
+                  <div className="p-4 border-t shrink-0 flex justify-end gap-3 bg-card pb-20 xl:pb-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsCreating(false)
+                        setEditingPost(null)
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      form="post-form"
+                      disabled={!user}
+                      className="bg-brand-forest text-white hover:bg-brand-forest/90 font-bold px-8"
+                    >
+                      <Check className="w-4 h-4 mr-2" /> Salvar Edição
+                    </Button>
+                  </div>
+                </div>
+
+                <div
+                  className={cn(
+                    'w-full xl:w-1/2 bg-[#EAEAEA] flex-col',
+                    mobileTab !== 'preview' && 'hidden xl:flex',
+                  )}
+                >
+                  <div className="p-3 border-b bg-card shrink-0 flex flex-col gap-3 shadow-sm z-10">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                        Visualização: {PREVIEW_FORMATS.find((f) => f.id === previewFormat)?.label}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {PREVIEW_FORMATS.map((f) => (
+                        <Button
+                          key={f.id}
+                          type="button"
+                          variant={previewFormat === f.id ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPreviewFormat(f.id)}
+                          className="text-xs whitespace-nowrap h-7 rounded-full"
+                        >
+                          {f.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-hidden relative flex items-center justify-center p-4">
+                    <div
+                      className={cn(
+                        'bg-white shadow-elevation overflow-y-auto transition-all duration-500 ease-in-out [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
+                        PREVIEW_FORMATS.find((f) => f.id === previewFormat)?.className,
+                      )}
+                    >
+                      <div className="animate-fade-in min-h-full">
+                        <PostPreviewLayout
+                          post={watchAll as any}
+                          imageUrl={imagePreview}
+                          format={previewFormat}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Dialog open={isAIAssistantOpen} onOpenChange={setIsAIAssistantOpen}>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-brand-forest" />
+                        Editor Estratégico IA
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                      {aiLoading ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-4">
+                          <Loader2 className="w-8 h-8 animate-spin text-brand-forest" />
+                          <p className="text-sm">
+                            Analisando o conteúdo e gerando recomendações SEO...
+                          </p>
+                        </div>
+                      ) : aiSuggestions ? (
+                        <div className="space-y-6">
+                          <div className="space-y-3">
+                            <Label className="font-bold text-sm">Títulos Sugeridos (SEO)</Label>
+                            <div className="grid gap-2">
+                              {aiSuggestions.titles.map((t, i) => (
+                                <div key={i} className="flex gap-2 items-center">
+                                  <div className="flex-1 p-3 border rounded-md text-sm bg-muted/20 font-serif">
+                                    {t}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setValue('title', t)}
+                                  >
+                                    Usar
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="font-bold text-sm">Meta-Description Sugerida</Label>
+                            <div className="p-3 border rounded-md text-sm bg-muted/20 text-muted-foreground">
+                              {aiSuggestions.meta_description}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="font-bold text-sm">Hashtags para Redes Sociais</Label>
+                            <div className="p-3 border rounded-md text-sm bg-muted/20 text-brand-forest font-medium">
+                              {aiSuggestions.hashtags}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Mobile Tab Switcher */}
+                <div className="xl:hidden absolute bottom-6 right-6 z-50">
+                  <Button
+                    size="icon"
+                    className="h-14 w-14 rounded-full shadow-elevation bg-brand-forest hover:bg-brand-forest/90 text-white"
+                    onClick={() => setMobileTab(mobileTab === 'form' ? 'preview' : 'form')}
+                  >
+                    {mobileTab === 'form' ? (
+                      <Eye className="w-6 h-6" />
+                    ) : (
+                      <Edit2 className="w-6 h-6" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground bg-muted/10 animate-fade-in">
+                <div className="w-20 h-20 rounded-full bg-card shadow-sm flex items-center justify-center mb-6">
+                  <Edit className="w-10 h-10 text-muted-foreground/50" />
+                </div>
+                <h2 className="font-serif text-2xl font-bold text-foreground mb-2">
+                  Sala de Redação
+                </h2>
+                <p className="text-sm">
+                  Selecione uma matéria no acervo ou inicie uma nova edição.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
