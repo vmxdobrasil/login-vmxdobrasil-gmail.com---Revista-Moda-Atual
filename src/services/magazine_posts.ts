@@ -7,6 +7,12 @@ export interface MagazinePost {
   author: string
   content: string
   type: 'social' | 'trends' | 'interview' | 'marketing' | 'style' | 'brand_history' | 'sacoleira'
+  para_category?: 'projects' | 'areas' | 'resources' | 'archive'
+  content_voice?: 'editorial' | 'commercial' | 'conversion'
+  hook?: string
+  seo_keywords?: string
+  hashtags?: string
+  cta_text?: string
   main_image: string
   gallery?: string[]
   columnist_bio?: string

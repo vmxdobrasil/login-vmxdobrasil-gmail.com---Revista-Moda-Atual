@@ -2,8 +2,17 @@ import { useState, useEffect } from 'react'
 import { FashionEvent, getEvents } from '@/services/fashion_events'
 import { useRealtime } from '@/hooks/use-realtime'
 import pb from '@/lib/pocketbase/client'
-import { Camera, Calendar, Share2, MessageCircle } from 'lucide-react'
+import { Camera, Calendar, Share2, MessageCircle, Settings2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/use-auth'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { SpotlightManager } from '@/components/studio/SpotlightManager'
 
 const CATEGORIES = ['All', 'Desfile', 'Festa', 'Tapete Vermelho', 'Outros']
 
@@ -59,6 +68,8 @@ export default function EventsPage() {
 
   const galleryData: any[] = (spotlight?.gallery_data as any[]) || []
 
+  const { user } = useAuth()
+
   const handleShare = (legend: string, imgUrl?: string) => {
     const text = `Confira ${legend} na Coluna Holofote da Revista Moda Atual!`
     const url = window.location.href
@@ -79,23 +90,48 @@ export default function EventsPage() {
           <div className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-forest/10 rounded-full border border-brand-forest/20 shadow-sm">
             <Camera className="w-5 h-5 text-brand-forest" />
             <span className="text-sm font-bold tracking-[0.2em] uppercase text-brand-forest">
-              Colunista: Fabia Mendonça
+              Cobertura Especial: Editora de Moda
             </span>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center justify-center gap-2 flex-wrap mb-16">
-          {CATEGORIES.map((cat) => (
-            <Button
-              key={cat}
-              variant={activeCategory === cat ? 'default' : 'outline'}
-              className={`rounded-full px-6 text-xs uppercase tracking-widest font-bold ${activeCategory === cat ? 'bg-brand-forest text-white' : 'text-muted-foreground hover:text-brand-forest'}`}
-              onClick={() => setActiveCategory(cat)}
-            >
-              {cat === 'All' ? 'Todas' : cat}
-            </Button>
-          ))}
+        {/* Filters and Management */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-16">
+          <div className="flex items-center justify-center gap-2 flex-wrap flex-1">
+            {CATEGORIES.map((cat) => (
+              <Button
+                key={cat}
+                variant={activeCategory === cat ? 'default' : 'outline'}
+                className={`rounded-full px-6 text-xs uppercase tracking-widest font-bold ${activeCategory === cat ? 'bg-brand-forest text-white' : 'text-muted-foreground hover:text-brand-forest'}`}
+                onClick={() => setActiveCategory(cat)}
+              >
+                {cat === 'All' ? 'Todas' : cat}
+              </Button>
+            ))}
+          </div>
+          {user && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="shrink-0 font-bold border-brand-forest text-brand-forest hover:bg-brand-forest hover:text-white"
+                >
+                  <Settings2 className="w-4 h-4 mr-2" />
+                  Gerenciar Editoria
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-5xl h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="font-serif text-2xl text-brand-forest">
+                    Gerenciar Coberturas & Eventos (Editora de Moda)
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                  <SpotlightManager />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {!spotlight ? (

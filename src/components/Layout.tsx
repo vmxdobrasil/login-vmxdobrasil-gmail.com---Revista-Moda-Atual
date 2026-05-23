@@ -19,6 +19,7 @@ import {
   LogIn,
   Image as ImageIcon,
   Calendar,
+  Library,
 } from 'lucide-react'
 import useEditorStore from '@/stores/use-editor-store'
 import { ExportDialog } from './ExportDialog'
@@ -78,6 +79,14 @@ export default function Layout() {
                   <Link to="/events">
                     <Calendar className="w-4 h-4" />
                     <span>Eventos</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={location.pathname === '/magazine'}>
+                  <Link to="/magazine">
+                    <Library className="w-4 h-4" />
+                    <span>Revista</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

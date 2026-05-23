@@ -46,24 +46,50 @@ const SECTIONS = [
   { id: 'sacoleira', label: 'Sacoleira' },
 ] as const
 
-const formSchema = z.object({
-  title: z.string().min(1, 'O título é obrigatório'),
-  subtitle: z.string().optional(),
-  author: z.string().min(1, 'O autor é obrigatório'),
-  content: z.string().min(1, 'O conteúdo é obrigatório'),
-  type: z.enum([
-    'social',
-    'trends',
-    'interview',
-    'marketing',
-    'style',
-    'brand_history',
-    'sacoleira',
-  ]),
-  columnist_bio: z.string().optional(),
-  is_published: z.boolean().default(false),
-  status: z.enum(['draft', 'review', 'published']).default('draft'),
-})
+const formSchema = z
+  .object({
+    title: z.string().min(1, 'O título é obrigatório'),
+    subtitle: z.string().optional(),
+    author: z.string().min(1, 'O autor é obrigatório'),
+    content: z.string().min(1, 'O conteúdo é obrigatório'),
+    type: z.enum([
+      'social',
+      'trends',
+      'interview',
+      'marketing',
+      'style',
+      'brand_history',
+      'sacoleira',
+    ]),
+    para_category: z.enum(['projects', 'areas', 'resources', 'archive']).optional(),
+    content_voice: z.enum(['editorial', 'commercial', 'conversion']).optional(),
+    hook: z.string().optional(),
+    seo_keywords: z.string().optional(),
+    hashtags: z.string().optional(),
+    cta_text: z.string().optional(),
+    columnist_bio: z.string().optional(),
+    is_published: z.boolean().default(false),
+    status: z.enum(['draft', 'review', 'published']).default('draft'),
+  })
+  .refine(
+    (data) => {
+      if (data.content_voice === 'commercial' || data.content_voice === 'conversion') {
+        if (!data.hook || data.hook.trim() === '') {
+          return false
+        }
+        const tags = data.hashtags ? data.hashtags.match(/#/g)?.length || 0 : 0
+        if (tags < 7) {
+          return false
+        }
+      }
+      return true
+    },
+    {
+      message:
+        "Posts Estratégicos (Comercial ou Conversão) exigem 'Hook' preenchido e pelo menos 7 hashtags (#).",
+      path: ['status'],
+    },
+  )
 
 type FormDataType = z.infer<typeof formSchema>
 
@@ -103,6 +129,8 @@ export default function Studio() {
   // AI states
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
+  const [isReels, setIsReels] = useState(false)
+  const [trendCuratorship, setTrendCuratorship] = useState('')
   const [aiSuggestions, setAiSuggestions] = useState<{
     titles: string[]
     meta_description: string
@@ -128,6 +156,12 @@ export default function Studio() {
       author: '',
       content: '',
       type: 'social',
+      para_category: 'projects',
+      content_voice: 'editorial',
+      hook: '',
+      seo_keywords: '',
+      hashtags: '',
+      cta_text: '',
       columnist_bio: '',
       is_published: false,
       status: 'draft',
@@ -199,6 +233,12 @@ export default function Studio() {
             : 'Redação',
       content: '<p></p>',
       type: initialType,
+      para_category: 'projects',
+      content_voice: 'editorial',
+      hook: '',
+      seo_keywords: '',
+      hashtags: '',
+      cta_text: '',
       columnist_bio:
         initialType === 'marketing' ? '25 anos de experiência em Marketing e Branding' : '',
       is_published: false,
@@ -221,6 +261,12 @@ export default function Studio() {
       author: post.author,
       content: post.content,
       type: post.type,
+      para_category: post.para_category || 'projects',
+      content_voice: post.content_voice || 'editorial',
+      hook: post.hook || '',
+      seo_keywords: post.seo_keywords || '',
+      hashtags: post.hashtags || '',
+      cta_text: post.cta_text || '',
       columnist_bio: post.columnist_bio || '',
       is_published: post.is_published,
       status: post.status || 'draft',
@@ -270,7 +316,13 @@ export default function Studio() {
     formData.append('author', data.author)
     formData.append('content', data.content)
     formData.append('type', data.type)
-    if (data.columnist_bio) formData.append('columnist_bio', data.columnist_bio)
+    formData.append('para_category', data.para_category || 'projects')
+    formData.append('content_voice', data.content_voice || 'editorial')
+    formData.append('hook', data.hook || '')
+    formData.append('seo_keywords', data.seo_keywords || '')
+    formData.append('hashtags', data.hashtags || '')
+    formData.append('cta_text', data.cta_text || '')
+    formData.append('columnist_bio', data.columnist_bio || '')
     formData.append('is_published', String(data.is_published))
     formData.append('status', data.status)
 
@@ -314,6 +366,50 @@ export default function Studio() {
       : watchAll.gallery
         ? watchAll.gallery.map((f: string) => pb.files.getURL(watchAll as any, f))
         : []
+
+  const handleStrategicAiAssist = async () => {
+    const content = watch('content')
+    const voice = watch('content_voice')
+    const para = watch('para_category')
+    if (!content || content.length < 15) {
+      toast({
+        title: 'Atenção',
+        description: 'Escreva um esboço para a Editora Estratégica processar.',
+      })
+      return
+    }
+    setAiLoading(true)
+    setIsAIAssistantOpen(true)
+    setAiSuggestions(null)
+    try {
+      const res = await pb.send('/backend/v1/ai/editor-strategic', {
+        method: 'POST',
+        body: JSON.stringify({
+          content,
+          content_voice: voice,
+          para_category: para,
+          is_reels: isReels,
+          trend_curatorship: trendCuratorship,
+        }),
+      })
+      setValue('hook', res.hook || '')
+      setValue('content', res.content || '')
+      setValue('seo_keywords', res.seo_keywords || '')
+      setValue('cta_text', res.cta_text || '')
+      setValue('hashtags', res.hashtags || '')
+      toast({ title: 'Sucesso', description: 'Conteúdo Estratégico gerado com IA!' })
+      setIsAIAssistantOpen(false)
+    } catch (err) {
+      toast({
+        title: 'Erro',
+        description: 'Falha ao processar com IA Estratégica.',
+        variant: 'destructive',
+      })
+      setIsAIAssistantOpen(false)
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   const handleAiAssist = async () => {
     const content = watch('content')
@@ -427,11 +523,16 @@ export default function Studio() {
                           {post.title}
                         </span>
                       </div>
-                      <div className="text-xs text-muted-foreground flex justify-between items-center mb-3">
+                      <div className="text-xs text-muted-foreground flex justify-between items-center mb-3 gap-2 flex-wrap">
                         <span className="font-medium">{post.author}</span>
-                        <span className="uppercase tracking-wider text-[10px] border px-2 py-0.5 rounded bg-muted/50">
-                          {post.type}
-                        </span>
+                        <div className="flex gap-2">
+                          <span className="uppercase tracking-wider text-[10px] border px-2 py-0.5 rounded bg-muted/50">
+                            {post.type}
+                          </span>
+                          <span className="uppercase tracking-wider text-[10px] border px-2 py-0.5 rounded bg-brand-forest/10 text-brand-forest font-bold">
+                            PARA: {post.para_category || 'projects'}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between border-t pt-3">
                         <span
@@ -504,19 +605,49 @@ export default function Studio() {
                           Aviso: Você precisa fazer login para salvar suas edições.
                         </div>
                       )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                            Coluna / Seção
+                          </Label>
+                          <select
+                            {...register('type')}
+                            className="w-full border rounded-md p-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-brand-forest"
+                          >
+                            {SECTIONS.filter((s) => s.id !== 'all').map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
+                            Categoria PARA
+                          </Label>
+                          <select
+                            {...register('para_category')}
+                            className="w-full border rounded-md p-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-brand-forest"
+                          >
+                            <option value="projects">Projetos</option>
+                            <option value="areas">Áreas</option>
+                            <option value="resources">Recursos</option>
+                            <option value="archive">Arquivo</option>
+                          </select>
+                        </div>
+                      </div>
+
                       <div className="space-y-2">
                         <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                          Coluna / Seção
+                          Persona de Voz (Editor Estratégico)
                         </Label>
                         <select
-                          {...register('type')}
+                          {...register('content_voice')}
                           className="w-full border rounded-md p-3 text-sm bg-transparent outline-none focus:ring-2 focus:ring-brand-forest"
                         >
-                          {SECTIONS.filter((s) => s.id !== 'all').map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.label}
-                            </option>
-                          ))}
+                          <option value="editorial">Editorial (Revista)</option>
+                          <option value="commercial">Comercial (V MODA BRASIL)</option>
+                          <option value="conversion">Conversão (Parceiros/Lojistas)</option>
                         </select>
                       </div>
 
@@ -683,36 +814,126 @@ export default function Studio() {
                         </div>
                       )}
 
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="uppercase tracking-wider text-xs font-bold text-muted-foreground">
-                            Corpo do Texto (HTML)
+                      <div className="space-y-4 border p-4 rounded-lg bg-brand-forest/5 border-brand-forest/20">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-brand-forest/20 pb-3 mb-3 gap-3">
+                          <Label className="uppercase tracking-wider text-sm font-bold text-brand-forest flex items-center gap-2">
+                            <Sparkles className="w-4 h-4" /> Editora Estratégica (PARA)
                           </Label>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs bg-brand-forest/10 text-brand-forest border-brand-forest/20 hover:bg-brand-forest hover:text-white"
-                            onClick={handleAiAssist}
-                          >
-                            <Sparkles className="w-3 h-3 mr-2" /> Assistente IA
-                          </Button>
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 text-xs font-semibold text-brand-forest cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isReels}
+                                onChange={(e) => setIsReels(e.target.checked)}
+                                className="accent-brand-forest w-4 h-4 rounded border-brand-forest/30"
+                              />
+                              Reels (15-18m)
+                            </label>
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              className="h-8 text-xs bg-brand-forest text-white hover:bg-brand-forest/90 shadow-sm"
+                              onClick={handleStrategicAiAssist}
+                            >
+                              <Sparkles className="w-3 h-3 mr-2" /> Gerar Conteúdo Estratégico
+                            </Button>
+                          </div>
                         </div>
-                        <Textarea
-                          {...register('content')}
-                          placeholder="<p>Escreva o texto principal aqui...</p>"
-                          className={`min-h-[250px] font-mono text-sm leading-relaxed resize-none ${errors.content ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-brand-forest'}`}
-                        />
-                        {errors.content && (
-                          <span className="text-xs text-red-500 font-medium">
-                            {errors.content.message}
-                          </span>
-                        )}
+
+                        <div className="space-y-2">
+                          <Label className="uppercase tracking-wider text-[10px] font-bold text-muted-foreground">
+                            Hook (2 Segundos)
+                          </Label>
+                          <Input
+                            {...register('hook')}
+                            placeholder="Frase de impacto para prender a atenção..."
+                            className={`font-serif border-brand-forest/30 bg-white ${errors.status ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:ring-brand-forest'}`}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="uppercase tracking-wider text-[10px] font-bold text-muted-foreground">
+                            Curadoria de Tendências (Input para IA)
+                          </Label>
+                          <Textarea
+                            value={trendCuratorship}
+                            onChange={(e) => setTrendCuratorship(e.target.value)}
+                            placeholder="Insira dados de nicho, ex: Tons terrosos, acessórios de couro em alta no Brás..."
+                            className="min-h-[60px] text-xs bg-white border-brand-forest/30 focus-visible:ring-brand-forest resize-none"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="uppercase tracking-wider text-[10px] font-bold text-muted-foreground">
+                              Corpo do Texto (HTML)
+                            </Label>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] text-muted-foreground hover:text-brand-forest"
+                              onClick={handleAiAssist}
+                            >
+                              IA Padrão
+                            </Button>
+                          </div>
+                          <Textarea
+                            {...register('content')}
+                            placeholder="<p>Escreva o texto principal ou deixe a Editora Estratégica gerar...</p>"
+                            className={`min-h-[200px] font-mono text-sm leading-relaxed resize-none bg-white ${errors.content ? 'border-red-500 focus-visible:ring-red-500' : 'border-brand-forest/30 focus-visible:ring-brand-forest'}`}
+                          />
+                          {errors.content && (
+                            <span className="text-xs text-red-500 font-medium">
+                              {errors.content.message}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="uppercase tracking-wider text-[10px] font-bold text-muted-foreground">
+                            Palavras-chave SEO
+                          </Label>
+                          <Input
+                            {...register('seo_keywords')}
+                            placeholder="Ex: moda atacado, lojista de moda, confecção..."
+                            className="text-xs border-brand-forest/30 focus-visible:ring-brand-forest bg-white"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="uppercase tracking-wider text-[10px] font-bold text-muted-foreground">
+                              Call to Action (CTA)
+                            </Label>
+                            <Input
+                              {...register('cta_text')}
+                              placeholder="Ex: Siga nosso perfil..."
+                              className="text-xs border-brand-forest/30 focus-visible:ring-brand-forest bg-white"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="uppercase tracking-wider text-[10px] font-bold text-muted-foreground">
+                              Hashtags Estratégicas (7)
+                            </Label>
+                            <Input
+                              {...register('hashtags')}
+                              placeholder="#moda #atacado..."
+                              className={`text-xs bg-white ${errors.status ? 'border-red-500 focus-visible:ring-red-500' : 'border-brand-forest/30 focus-visible:ring-brand-forest'}`}
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <div className="flex flex-col gap-3 border p-5 rounded-lg bg-muted/20">
                         <div>
                           <Label className="text-base font-bold">Status Editorial</Label>
+                          {errors.status && (
+                            <p className="text-sm text-red-500 mt-1 font-medium">
+                              {errors.status.message}
+                            </p>
+                          )}
                           <p className="text-sm text-muted-foreground mt-1">
                             Apenas matérias marcadas como "Publicado" aparecem no site e link na
                             bio.
@@ -785,14 +1006,40 @@ export default function Studio() {
                         PREVIEW_FORMATS.find((f) => f.id === previewFormat)?.className,
                       )}
                     >
-                      <div className="animate-fade-in min-h-full">
-                        <PostPreviewLayout
-                          post={watchAll as any}
-                          imageUrl={imagePreview}
-                          galleryUrls={currentGalleryUrls}
-                          columnistPhotoUrl={columnistPhotoPreview}
-                          format={previewFormat}
-                        />
+                      <div className="animate-fade-in min-h-full flex flex-col">
+                        {watchAll.hook && (
+                          <div className="bg-brand-forest text-white p-4 font-serif font-bold text-center italic border-b-4 border-black/20 text-lg leading-snug shadow-sm">
+                            "{watchAll.hook}"
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <PostPreviewLayout
+                            post={watchAll as any}
+                            imageUrl={imagePreview}
+                            galleryUrls={currentGalleryUrls}
+                            columnistPhotoUrl={columnistPhotoPreview}
+                            format={previewFormat}
+                          />
+                        </div>
+                        {(watchAll.cta_text || watchAll.hashtags || watchAll.seo_keywords) && (
+                          <div className="bg-white p-4 border-t text-sm space-y-3 shrink-0">
+                            {watchAll.cta_text && (
+                              <div className="font-bold text-brand-forest flex items-start gap-2">
+                                <span>📣</span> <span>{watchAll.cta_text}</span>
+                              </div>
+                            )}
+                            {watchAll.hashtags && (
+                              <div className="text-blue-600 font-medium text-xs break-words leading-relaxed">
+                                {watchAll.hashtags}
+                              </div>
+                            )}
+                            {watchAll.seo_keywords && (
+                              <div className="text-[10px] text-muted-foreground/60 uppercase tracking-widest pt-3 mt-3 border-t">
+                                SEO: {watchAll.seo_keywords}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -803,7 +1050,7 @@ export default function Studio() {
                     <DialogHeader>
                       <DialogTitle className="flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-brand-forest" />
-                        Editor Estratégico IA
+                        Editora Estratégica IA
                       </DialogTitle>
                     </DialogHeader>
                     <div className="py-4">

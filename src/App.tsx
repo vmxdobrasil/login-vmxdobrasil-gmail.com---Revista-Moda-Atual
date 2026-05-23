@@ -14,6 +14,7 @@ import MediaLibrary from './pages/MediaLibrary'
 import EventsPage from './pages/Events'
 import ContributorProfile from './pages/ContributorProfile'
 import LinkInBio from './pages/LinkInBio'
+import MagazinePage from './pages/Magazine'
 
 const App = () => (
   <BrowserRouter future={{ v7_startTransition: false, v7_relativeSplatPath: false }}>
@@ -29,6 +30,7 @@ const App = () => (
               <Route path="/studio" element={<Studio />} />
               <Route path="/media" element={<MediaLibrary />} />
               <Route path="/events" element={<EventsPage />} />
+              <Route path="/magazine" element={<MagazinePage />} />
               <Route path="/contributors/:id" element={<ContributorProfile />} />
             </Route>
             <Route path="/link-in-bio" element={<LinkInBio />} />

@@ -13,7 +13,11 @@ type Message = {
 export function Chatbot() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Olá! Sou a Assistente ModaAtual. Como posso ajudar você hoje?' },
+    {
+      role: 'assistant',
+      content:
+        'Olá! Sou a Editora de Moda da Revista Moda Atual. Como posso ajudar você com tendências e curadoria hoje?',
+    },
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -65,7 +69,7 @@ export function Chatbot() {
           <div className="bg-brand-forest text-white p-4 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
-              <span className="font-serif font-bold text-sm">Assistente ModaAtual</span>
+              <span className="font-serif font-bold text-sm">Editora de Moda</span>
             </div>
             <Button
               variant="ghost"
