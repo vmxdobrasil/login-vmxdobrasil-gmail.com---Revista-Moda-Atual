@@ -12,10 +12,10 @@ export interface MagazineIssue {
   updated: string
 }
 
-export const getMagazineIssues = () =>
-  pb
-    .collection('magazine_issues')
-    .getFullList<MagazineIssue>({ sort: '-publication_date', filter: 'is_published = true' })
+export const getPublishedIssues = () =>
+  pb.collection('magazine_issues').getFullList<MagazineIssue>({
+    filter: 'is_published = true',
+    sort: '-publication_date,-created',
+  })
 
-export const getMagazineIssue = (id: string) =>
-  pb.collection('magazine_issues').getOne<MagazineIssue>(id)
+export const getIssue = (id: string) => pb.collection('magazine_issues').getOne<MagazineIssue>(id)

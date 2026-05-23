@@ -1,192 +1,191 @@
 import { useState, useEffect } from 'react'
-import { MagazineIssue, getMagazineIssues } from '@/services/magazine_issues'
+import { getPublishedIssues, MagazineIssue } from '@/services/magazine_issues'
 import pb from '@/lib/pocketbase/client'
-import { BookOpen, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel'
+import { ArrowLeft, BookOpen, Loader2, Maximize } from 'lucide-react'
 
 export default function MagazinePage() {
   const [issues, setIssues] = useState<MagazineIssue[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<MagazineIssue | null>(null)
-  const [currentPage, setCurrentPage] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getMagazineIssues().then(setIssues).catch(console.error)
+    getPublishedIssues()
+      .then((data) => {
+        setIssues(data)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setError('Não foi possível carregar as edições da revista.')
+        setLoading(false)
+      })
   }, [])
 
-  const handleOpen = (issue: MagazineIssue) => {
-    setSelectedIssue(issue)
-    setCurrentPage(0)
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-forest" />
+      </div>
+    )
   }
 
-  const handleClose = () => {
-    setSelectedIssue(null)
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center text-red-500 font-medium">
+        {error}
+      </div>
+    )
   }
 
-  const next = () => {
-    if (!selectedIssue) return
-    const total = getPages(selectedIssue).length
-    if (currentPage < total - 1) setCurrentPage((p) => p + 1)
-  }
+  if (selectedIssue) {
+    const pages = [selectedIssue.cover_image, ...(selectedIssue.pages || [])].filter(
+      Boolean,
+    ) as string[]
 
-  const prev = () => {
-    if (currentPage > 0) setCurrentPage((p) => p - 1)
-  }
-
-  const getCoverUrl = (issue: MagazineIssue) => {
-    return issue.cover_image
-      ? pb.files.getURL(issue, issue.cover_image)
-      : 'https://img.usecurling.com/p/600/800?q=fashion%20magazine'
-  }
-
-  const getPages = (issue: MagazineIssue) => {
-    if (issue.pages && issue.pages.length > 0) {
-      return issue.pages.map((p) => pb.files.getURL(issue, p))
-    }
-    return []
-  }
-
-  return (
-    <div className="min-h-screen bg-[#FDFBF7] p-8 md:p-12 overflow-y-auto">
-      <div className="max-w-6xl mx-auto space-y-12">
-        <div className="text-center space-y-4">
-          <h1 className="font-serif text-5xl md:text-6xl font-bold tracking-tighter text-foreground">
-            Curadoria da Editora
-          </h1>
-          <p className="text-muted-foreground font-serif text-lg max-w-2xl mx-auto">
-            Nossas edições exclusivas preparadas com foco em tendências, acessórios, beleza e
-            colorimetria.
-          </p>
+    return (
+      <div className="h-full flex flex-col bg-[#111] text-white relative">
+        <div className="p-4 flex items-center justify-between border-b border-white/10 shrink-0 bg-black/40 backdrop-blur-sm z-10">
+          <Button
+            variant="ghost"
+            className="text-white hover:bg-white/10"
+            onClick={() => setSelectedIssue(null)}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar ao Acervo
+          </Button>
+          <div className="text-center">
+            <h2 className="font-serif font-bold text-lg tracking-wide">{selectedIssue.title}</h2>
+            {selectedIssue.edition_number && (
+              <p className="text-xs text-white/60">Edição {selectedIssue.edition_number}</p>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10 opacity-0 md:opacity-100 pointer-events-none"
+          >
+            <Maximize className="w-4 h-4" />
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-          {issues.map((issue) => (
-            <div
-              key={issue.id}
-              className="group cursor-pointer space-y-4"
-              onClick={() => handleOpen(issue)}
-            >
-              <div className="aspect-[3/4] bg-muted shadow-lg group-hover:shadow-2xl transition-all duration-500 relative overflow-hidden">
-                <img
-                  src={getCoverUrl(issue)}
-                  alt={issue.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-300">
-                  <Button
-                    variant="secondary"
-                    className="font-bold uppercase tracking-wider text-xs pointer-events-none"
-                  >
-                    <BookOpen className="w-4 h-4 mr-2" />
-                    Ver Edição
-                  </Button>
-                </div>
-              </div>
-              <div className="text-center">
-                <h3 className="font-serif font-bold text-lg leading-tight">{issue.title}</h3>
-                {issue.edition_number && (
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground mt-1">
-                    Edição {issue.edition_number}
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-          {issues.length === 0 && (
-            <div className="col-span-full text-center py-20 text-muted-foreground italic font-serif">
-              Nenhuma edição publicada no momento.
+        <div className="flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden relative">
+          {/* Subtle background glow based on current state */}
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-forest/10 to-transparent pointer-events-none opacity-50" />
+
+          {pages.length > 0 ? (
+            <Carousel className="w-full max-w-4xl h-full flex flex-col justify-center">
+              <CarouselContent className="h-full items-center">
+                {pages.map((page, i) => (
+                  <CarouselItem key={i} className="flex items-center justify-center h-full">
+                    <div className="relative h-[85vh] w-auto aspect-[3/4] bg-white shadow-2xl overflow-hidden md:rounded-r-md md:rounded-l-sm border border-black/5 ring-1 ring-white/10 transition-transform duration-500">
+                      <img
+                        src={pb.files.getURL(selectedIssue, page)}
+                        alt={`Página ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Fake binding shadow */}
+                      <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-black/30 via-black/5 to-transparent pointer-events-none" />
+                      <div className="absolute inset-y-0 right-0 w-2 bg-gradient-to-l from-black/10 to-transparent pointer-events-none" />
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              {pages.length > 1 && (
+                <>
+                  <CarouselPrevious className="left-2 md:-left-12 bg-black/50 hover:bg-black/80 text-white border-white/20 h-12 w-12" />
+                  <CarouselNext className="right-2 md:-right-12 bg-black/50 hover:bg-black/80 text-white border-white/20 h-12 w-12" />
+                </>
+              )}
+            </Carousel>
+          ) : (
+            <div className="text-center text-white/50">
+              Esta edição não possui páginas cadastradas.
             </div>
           )}
         </div>
       </div>
+    )
+  }
 
-      {selectedIssue && (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex flex-col items-center justify-center">
-          <div className="absolute top-0 inset-x-0 p-4 md:p-6 flex justify-between items-start bg-gradient-to-b from-black/80 to-transparent z-20 pointer-events-none">
-            <div className="text-white">
-              <h2 className="font-serif text-2xl md:text-3xl font-bold">{selectedIssue.title}</h2>
-              <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mt-1 text-white/70 text-sm font-medium tracking-wide">
-                {selectedIssue.edition_number && <span>Edição {selectedIssue.edition_number}</span>}
-                {selectedIssue.publication_date && (
-                  <>
-                    <span className="hidden md:inline">•</span>
-                    <span className="capitalize">
-                      {new Date(selectedIssue.publication_date).toLocaleDateString('pt-BR', {
-                        month: 'long',
-                        year: 'numeric',
-                      })}
-                    </span>
-                  </>
-                )}
-              </div>
+  return (
+    <div className="h-full bg-background overflow-y-auto">
+      <div className="p-6 md:p-12 max-w-7xl mx-auto space-y-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-brand-forest/10 flex items-center justify-center rounded-xl">
+              <BookOpen className="w-6 h-6 text-brand-forest" />
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20 pointer-events-auto shrink-0"
-              onClick={handleClose}
-            >
-              <X className="w-8 h-8" />
-            </Button>
-          </div>
-
-          <div className="relative w-full max-w-5xl flex-1 aspect-[3/4] md:aspect-auto md:h-[85vh] flex items-center justify-center p-4 mt-16 md:mt-0">
-            {getPages(selectedIssue).length > 0 ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-4 md:-left-16 text-white hover:bg-white/20 disabled:opacity-30 z-10"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    prev()
-                  }}
-                  disabled={currentPage === 0}
-                >
-                  <ChevronLeft className="w-12 h-12" />
-                </Button>
-
-                <img
-                  key={currentPage}
-                  src={getPages(selectedIssue)[currentPage]}
-                  className="max-w-full max-h-full object-contain shadow-2xl animate-fade-in pointer-events-none"
-                  alt={`Página ${currentPage + 1}`}
-                />
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-4 md:-right-16 text-white hover:bg-white/20 disabled:opacity-30 z-10"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    next()
-                  }}
-                  disabled={currentPage === getPages(selectedIssue).length - 1}
-                >
-                  <ChevronRight className="w-12 h-12" />
-                </Button>
-
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm tracking-widest font-mono">
-                  {currentPage + 1} / {getPages(selectedIssue).length}
-                </div>
-              </>
-            ) : (
-              <div className="bg-white/10 backdrop-blur-md p-8 md:p-12 text-center rounded-xl max-w-lg mx-auto border border-white/20 shadow-2xl">
-                <BookOpen className="w-16 h-16 mx-auto mb-6 text-brand-gold opacity-80" />
-                <h3 className="font-serif text-2xl text-white mb-4">Em Preparação</h3>
-                <p className="text-white/80 font-sans leading-relaxed">
-                  Esta edição está sendo preparada pela nossa Editora de Moda. Volte em breve!
-                </p>
-                <Button
-                  onClick={handleClose}
-                  className="mt-8 bg-brand-gold hover:bg-brand-gold/90 text-black font-semibold"
-                >
-                  Voltar para o Acervo
-                </Button>
-              </div>
-            )}
+            <div>
+              <h1 className="font-serif text-3xl md:text-4xl font-bold text-foreground">
+                Acervo Digital
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Acesse todas as publicações exclusivas da Moda Atual.
+              </p>
+            </div>
           </div>
         </div>
-      )}
+
+        {issues.length === 0 ? (
+          <div className="text-center p-16 bg-muted/30 rounded-2xl border border-dashed">
+            <BookOpen className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+            <p className="text-muted-foreground font-serif text-lg">
+              Nenhuma edição publicada no momento.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 md:gap-8">
+            {issues.map((issue) => (
+              <div
+                key={issue.id}
+                className="group cursor-pointer flex flex-col gap-4"
+                onClick={() => setSelectedIssue(issue)}
+              >
+                <div className="aspect-[3/4] rounded-lg overflow-hidden border shadow-sm transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl group-hover:ring-2 ring-brand-forest/50 relative bg-muted flex-shrink-0">
+                  {issue.cover_image ? (
+                    <img
+                      src={pb.files.getURL(issue, issue.cover_image)}
+                      alt={issue.title}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-brand-forest/5 text-brand-forest/20">
+                      <BookOpen className="w-12 h-12" />
+                    </div>
+                  )}
+                  {/* Overlay on hover */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <Button
+                      variant="secondary"
+                      className="bg-white/90 text-black hover:bg-white border-0 shadow-lg"
+                    >
+                      Ler Agora
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-base leading-tight group-hover:text-brand-forest transition-colors line-clamp-2">
+                    {issue.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1.5 uppercase tracking-wider font-semibold">
+                    {issue.edition_number ? `Edição ${issue.edition_number}` : 'Especial'}
+                    {issue.publication_date &&
+                      ` • ${new Date(issue.publication_date).getFullYear()}`}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

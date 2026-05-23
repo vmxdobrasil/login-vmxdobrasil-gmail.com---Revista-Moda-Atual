@@ -27,6 +27,7 @@ import { getMediaAssets, MediaAsset } from '@/services/media_assets'
 import { PostPreviewLayout } from '@/components/studio/layouts'
 import { SpotlightManager } from '@/components/studio/SpotlightManager'
 import { LeadsDashboard } from '@/components/studio/LeadsDashboard'
+import { FashionCuratorship } from '@/components/studio/FashionCuratorship'
 import { useToast } from '@/hooks/use-toast'
 import { z } from 'zod'
 import { Sparkles, Loader2 } from 'lucide-react'
@@ -105,7 +106,9 @@ const PREVIEW_FORMATS = [
 export default function Studio() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [activeModule, setActiveModule] = useState<'posts' | 'spotlight' | 'leads'>('posts')
+  const [activeModule, setActiveModule] = useState<'posts' | 'spotlight' | 'leads' | 'curatorship'>(
+    'posts',
+  )
   const [posts, setPosts] = useState<MagazinePost[]>([])
   const [selectedSection, setSelectedSection] = useState<string>('all')
   const [editingPost, setEditingPost] = useState<MagazinePost | null>(null)
@@ -447,6 +450,9 @@ export default function Studio() {
             <TabsTrigger value="posts" className="flex-1">
               Redação
             </TabsTrigger>
+            <TabsTrigger value="curatorship" className="flex-1">
+              Curadoria
+            </TabsTrigger>
             <TabsTrigger value="spotlight" className="flex-1">
               Holofote
             </TabsTrigger>
@@ -494,6 +500,10 @@ export default function Studio() {
         {activeModule === 'leads' ? (
           <div className="flex-1 overflow-y-auto bg-muted/10">
             <LeadsDashboard />
+          </div>
+        ) : activeModule === 'curatorship' ? (
+          <div className="flex-1 overflow-y-auto bg-muted/10">
+            <FashionCuratorship />
           </div>
         ) : activeModule === 'spotlight' ? (
           <div className="flex-1 overflow-y-auto">
