@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getPublishedIssues, MagazineIssue } from '@/services/magazine_issues'
 import pb from '@/lib/pocketbase/client'
 import { Button } from '@/components/ui/button'
@@ -8,27 +8,77 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from '@/components/ui/carousel'
-import { ArrowLeft, BookOpen, Loader2, Maximize } from 'lucide-react'
+import { ArrowLeft, BookOpen, Loader2, Maximize, Minimize } from 'lucide-react'
+import { useRealtime } from '@/hooks/use-realtime'
 
 export default function MagazinePage() {
   const [issues, setIssues] = useState<MagazineIssue[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIssue, setSelectedIssue] = useState<MagazineIssue | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [api, setApi] = useState<CarouselApi>()
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const loadIssues = useCallback(async () => {
+    try {
+      const data = await getPublishedIssues()
+      setIssues(data)
+      setError(null)
+    } catch (err) {
+      console.error(err)
+      setError('Não foi possível carregar as edições da revista.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    getPublishedIssues()
-      .then((data) => {
-        setIssues(data)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error(err)
-        setError('Não foi possível carregar as edições da revista.')
-        setLoading(false)
-      })
+    loadIssues()
+  }, [loadIssues])
+
+  useRealtime('magazine_issues', () => {
+    loadIssues()
+  })
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedIssue) return
+      if (e.key === 'Escape') {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {})
+          setIsFullscreen(false)
+        } else {
+          setSelectedIssue(null)
+        }
+      }
+      if (e.key === 'ArrowRight' && api) {
+        api.scrollNext()
+      }
+      if (e.key === 'ArrowLeft' && api) {
+        api.scrollPrev()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedIssue, api])
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }, [])
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {})
+    } else {
+      document.exitFullscreen().catch(() => {})
+    }
+  }
 
   if (loading) {
     return (
@@ -70,9 +120,11 @@ export default function MagazinePage() {
           <Button
             variant="ghost"
             size="icon"
-            className="text-white hover:bg-white/10 opacity-0 md:opacity-100 pointer-events-none"
+            className="text-white hover:bg-white/10 opacity-0 md:opacity-100"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
           >
-            <Maximize className="w-4 h-4" />
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </Button>
         </div>
 
@@ -81,7 +133,10 @@ export default function MagazinePage() {
           <div className="absolute inset-0 bg-gradient-to-t from-brand-forest/10 to-transparent pointer-events-none opacity-50" />
 
           {pages.length > 0 ? (
-            <Carousel className="w-full max-w-4xl h-full flex flex-col justify-center">
+            <Carousel
+              setApi={setApi}
+              className="w-full max-w-4xl h-full flex flex-col justify-center"
+            >
               <CarouselContent className="h-full items-center">
                 {pages.map((page, i) => (
                   <CarouselItem key={i} className="flex items-center justify-center h-full">
@@ -90,6 +145,7 @@ export default function MagazinePage() {
                         src={pb.files.getURL(selectedIssue, page)}
                         alt={`Página ${i + 1}`}
                         className="w-full h-full object-cover"
+                        loading={i < 2 ? 'eager' : 'lazy'}
                       />
                       {/* Fake binding shadow */}
                       <div className="absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-black/30 via-black/5 to-transparent pointer-events-none" />
@@ -152,9 +208,10 @@ export default function MagazinePage() {
                 <div className="aspect-[3/4] rounded-lg overflow-hidden border shadow-sm transition-all duration-300 group-hover:scale-[1.02] group-hover:shadow-2xl group-hover:ring-2 ring-brand-forest/50 relative bg-muted flex-shrink-0">
                   {issue.cover_image ? (
                     <img
-                      src={pb.files.getURL(issue, issue.cover_image)}
+                      src={pb.files.getURL(issue, issue.cover_image, { thumb: '400x600' })}
                       alt={issue.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 bg-white"
+                      loading="lazy"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-brand-forest/5 text-brand-forest/20">
