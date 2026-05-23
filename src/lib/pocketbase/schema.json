@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-28T19:06:20.130Z",
+  "generatedAt": "2026-05-23T03:40:46.421Z",
   "collections": [
     {
       "name": "users",
@@ -29,14 +29,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "bio",
@@ -129,21 +134,30 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "status",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["draft", "review", "published"]
+          "selectValues": [
+            "draft",
+            "review",
+            "published"
+          ]
         },
         {
           "name": "gallery",
@@ -164,7 +178,9 @@
           "system": false
         }
       ],
-      "indexes": ["CREATE INDEX `idx_posts_status` ON `magazine_posts` (status)"]
+      "indexes": [
+        "CREATE INDEX `idx_posts_status` ON `magazine_posts` (status)"
+      ]
     },
     {
       "name": "media_assets",
@@ -200,14 +216,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": []
@@ -258,14 +279,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "is_spotlight",
@@ -284,7 +310,12 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Desfile", "Festa", "Tapete Vermelho", "Outros"]
+          "selectValues": [
+            "Desfile",
+            "Festa",
+            "Tapete Vermelho",
+            "Outros"
+          ]
         },
         {
           "name": "gallery_data",
@@ -323,7 +354,10 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["advertise", "subscribe"]
+          "selectValues": [
+            "advertise",
+            "subscribe"
+          ]
         },
         {
           "name": "notes",
@@ -336,14 +370,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": []
