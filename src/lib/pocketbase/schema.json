@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-23T16:50:16.920Z",
+  "generatedAt": "2026-05-23T21:25:30.769Z",
   "collections": [
     {
       "name": "users",
@@ -29,14 +29,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "bio",
@@ -129,21 +134,30 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "status",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["draft", "review", "published"]
+          "selectValues": [
+            "draft",
+            "review",
+            "published"
+          ]
         },
         {
           "name": "gallery",
@@ -168,14 +182,23 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["projects", "areas", "resources", "archive"]
+          "selectValues": [
+            "projects",
+            "areas",
+            "resources",
+            "archive"
+          ]
         },
         {
           "name": "content_voice",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["editorial", "commercial", "conversion"]
+          "selectValues": [
+            "editorial",
+            "commercial",
+            "conversion"
+          ]
         },
         {
           "name": "hook",
@@ -202,7 +225,9 @@
           "system": false
         }
       ],
-      "indexes": ["CREATE INDEX `idx_posts_status` ON `magazine_posts` (status)"]
+      "indexes": [
+        "CREATE INDEX `idx_posts_status` ON `magazine_posts` (status)"
+      ]
     },
     {
       "name": "media_assets",
@@ -238,14 +263,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": []
@@ -296,14 +326,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "is_spotlight",
@@ -322,7 +357,12 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["Desfile", "Festa", "Tapete Vermelho", "Outros"]
+          "selectValues": [
+            "Desfile",
+            "Festa",
+            "Tapete Vermelho",
+            "Outros"
+          ]
         },
         {
           "name": "gallery_data",
@@ -361,7 +401,10 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["advertise", "subscribe"]
+          "selectValues": [
+            "advertise",
+            "subscribe"
+          ]
         },
         {
           "name": "notes",
@@ -374,14 +417,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": []
@@ -438,14 +486,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
