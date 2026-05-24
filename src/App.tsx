@@ -25,16 +25,16 @@ const App = () => (
           <Sonner />
           <Routes>
             <Route element={<Layout />}>
-              <Route path="/" element={<Index />} />
-              <Route path="/templates" element={<Templates />} />
-              <Route path="/studio" element={<Studio />} />
-              <Route path="/media" element={<MediaLibrary />} />
-              <Route path="/events" element={<EventsPage />} />
-              <Route path="/magazine" element={<MagazinePage />} />
-              <Route path="/contributors/:id" element={<ContributorProfile />} />
+              <Route index element={<Index />} />
+              <Route path="templates" element={<Templates />} />
+              <Route path="studio" element={<Studio />} />
+              <Route path="media" element={<MediaLibrary />} />
+              <Route path="events" element={<EventsPage />} />
+              <Route path="magazine" element={<MagazinePage />} />
+              <Route path="contributors/:id" element={<ContributorProfile />} />
             </Route>
-            <Route path="/link-in-bio" element={<LinkInBio />} />
-            <Route path="/login" element={<Login />} />
+            <Route path="link-in-bio" element={<LinkInBio />} />
+            <Route path="login" element={<Login />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </TooltipProvider>
