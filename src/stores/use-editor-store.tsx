@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 export type Format = '1:1' | '9:16' | '16:9'
 export type Theme = 'light' | 'dark'
@@ -31,15 +31,33 @@ const initialState: EditorState = {
   format: '1:1',
   theme: 'light',
   filter: 'none',
-  templateId: 'cover',
+  templateId: 'editorial',
   isExporting: false,
   exportProgress: 0,
+}
+
+const loadState = (): EditorState => {
+  try {
+    const saved = localStorage.getItem('editor-state')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      return { ...initialState, ...parsed, isExporting: false, exportProgress: 0 }
+    }
+  } catch (e) {
+    console.error('Failed to load state', e)
+  }
+  return initialState
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
 
 export function EditorProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<EditorState>(initialState)
+  const [state, setState] = useState<EditorState>(loadState)
+
+  useEffect(() => {
+    const stateToSave = { ...state, isExporting: false, exportProgress: 0 }
+    localStorage.setItem('editor-state', JSON.stringify(stateToSave))
+  }, [state])
 
   const updateField = <K extends keyof EditorState>(field: K, value: EditorState[K]) => {
     setState((prev) => ({ ...prev, [field]: value }))

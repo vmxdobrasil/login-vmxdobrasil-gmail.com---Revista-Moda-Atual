@@ -23,7 +23,7 @@ export function CanvasPreview() {
       case 'quote':
         return <QuoteTemplate />
       default:
-        return <CoverTemplate />
+        return <EditorialTemplate />
     }
   }
 
